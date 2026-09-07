@@ -22,27 +22,27 @@
 
 <style>
   :root{
-    --paper:#eef1f4; --card:#ffffff; --ink:#12181f; --muted:#5b6672;
-    --line:#d3dae1; --line-soft:#e5eaef;
-    --boden:#2f8f6b; --boden-bg:#e4f2ec;
-    --ablehnung:#5f6b8a; --ablehnung-bg:#e8eaf1;
-    --unent:#b8842a; --unent-bg:#f6eddc;
-    --umstritten:#c56a3c; --umstritten-bg:#f6e6dc;
-    --einwand:#c0392b; --einwand-bg:#f7e2df;
-    --accent:#1f6f57;
-    --shadow:0 1px 2px rgba(16,24,31,.06),0 8px 24px rgba(16,24,31,.06);
-    --r:14px; --plot:#f8fafb;
+    --paper:#eef3f2; --card:#ffffff; --ink:#2d2d2d; --muted:#6b7280;
+    --line:#d5e0dd; --line-soft:#e6eeec;
+    --boden:#008f7a; --boden-bg:#e6f5f3;
+    --ablehnung:#005f54; --ablehnung-bg:#e8edec;
+    --unent:#6b7280; --unent-bg:#eef0f0;
+    --umstritten:#df7b63; --umstritten-bg:#faeae6;
+    --einwand:#c0472e; --einwand-bg:#f6e1db;
+    --accent:#008f7a;
+    --shadow:0 1px 2px rgba(0,95,84,.06),0 8px 24px rgba(0,95,84,.07);
+    --r:14px; --plot:#f6faf9;
   }
   @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
-    --paper:#0e1216;--card:#171d24;--ink:#eaf0f5;--muted:#9aa7b3;--line:#2a333c;--line-soft:#222a32;
-    --boden:#54c79b;--boden-bg:#12332a;--ablehnung:#9aa6cc;--ablehnung-bg:#1b2033;--unent:#e0b25f;--unent-bg:#2b2412;
-    --umstritten:#e08a5c;--umstritten-bg:#33210f;--einwand:#e8695b;--einwand-bg:#33150f;--accent:#54c79b;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);--plot:#10161c;}}
+    --paper:#0c1615;--card:#13201e;--ink:#eaf2f0;--muted:#9db0ac;--line:#26403b;--line-soft:#1d302c;
+    --boden:#35b89b;--boden-bg:#0f3a32;--ablehnung:#4e8378;--ablehnung-bg:#18302c;--unent:#9aa7a3;--unent-bg:#242b2a;
+    --umstritten:#e08a5c;--umstritten-bg:#3a2213;--einwand:#e8695b;--einwand-bg:#3a1610;--accent:#35b89b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);--plot:#0e1a18;}}
   :root[data-theme="dark"]{
-    --paper:#0e1216;--card:#171d24;--ink:#eaf0f5;--muted:#9aa7b3;--line:#2a333c;--line-soft:#222a32;
-    --boden:#54c79b;--boden-bg:#12332a;--ablehnung:#9aa6cc;--ablehnung-bg:#1b2033;--unent:#e0b25f;--unent-bg:#2b2412;
-    --umstritten:#e08a5c;--umstritten-bg:#33210f;--einwand:#e8695b;--einwand-bg:#33150f;--accent:#54c79b;
-    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);--plot:#10161c;}
+    --paper:#0c1615;--card:#13201e;--ink:#eaf2f0;--muted:#9db0ac;--line:#26403b;--line-soft:#1d302c;
+    --boden:#35b89b;--boden-bg:#0f3a32;--ablehnung:#4e8378;--ablehnung-bg:#18302c;--unent:#9aa7a3;--unent-bg:#242b2a;
+    --umstritten:#e08a5c;--umstritten-bg:#3a2213;--einwand:#e8695b;--einwand-bg:#3a1610;--accent:#35b89b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);--plot:#0e1a18;}
   *{box-sizing:border-box}html,body{margin:0}
   body{background:var(--paper);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
   h1,h2,h3{font-family:"Bricolage Grotesque",Inter,system-ui,sans-serif;line-height:1.1;margin:0;font-weight:700}
@@ -157,9 +157,9 @@ function statsFor(scale,theses,votes,i){
   const dist={};sc.opts.forEach(o=>dist[o.v]=0);rs.forEach(r=>dist[r]++);
   let cat;
   if(veto>0)cat="einwand";
-  else if(unity>=0.60&&x>=0.35)cat="boden";
-  else if(unity>=0.60&&x<=-0.35)cat="ablehnung";
-  else if(unity>=0.60)cat="unentschieden";
+  else if(unity>=0.50&&x>=0.35)cat="boden";
+  else if(unity>=0.50&&x<=-0.35)cat="ablehnung";
+  else if(unity>=0.50)cat="unentschieden";
   else cat="umstritten";
   return{n,mean,sd,x,unity,veto,dist,cat};
 }
@@ -173,18 +173,23 @@ function buildMap(scale,theses,votes){
   const padX=pw*0.11, padY=ph*0.11;
   const px=x=>x0+padX+((x+1)/2)*(pw-2*padX);
   const py=u=>y0+padY+(1-u)*(ph-2*padY);
-  const midX=px(0), thrY=py(0.6);
+  const midX=px(0), thrY=py(0.5);
   const svg=document.createElementNS(ns,"svg");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
   svg.setAttribute("role","img");svg.setAttribute("aria-label","Konsenskarte: Thesen nach Zustimmung und Einigkeit");
   const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
   const text=(x,y,s,o)=>{const t=add("text",Object.assign({x,y},o||{}));t.textContent=s;return t;};
-  add("rect",{x:midX,y:y0,width:x1-midX,height:thrY-y0,fill:"var(--boden-bg)"});
-  add("rect",{x:x0,y:y0,width:midX-x0,height:thrY-y0,fill:"var(--ablehnung-bg)"});
-  add("rect",{x:x0,y:thrY,width:pw,height:y1-thrY,fill:"var(--umstritten-bg)"});
+  // Zonenflächen, beschnitten auf die abgerundeten Ecken (sonst laufen sie über)
+  const defs=add("defs",{});
+  add("rect",{x:x0,y:y0,width:pw,height:ph,rx:12},add("clipPath",{id:"kkclip"},defs));
+  const zonesG=add("g",{"clip-path":"url(#kkclip)"});
+  add("rect",{x:midX,y:y0,width:x1-midX,height:thrY-y0,fill:"var(--boden-bg)"},zonesG);
+  add("rect",{x:x0,y:y0,width:midX-x0,height:thrY-y0,fill:"var(--ablehnung-bg)"},zonesG);
+  add("rect",{x:x0,y:thrY,width:pw,height:y1-thrY,fill:"var(--umstritten-bg)"},zonesG);
+  add("line",{x1:midX,y1:y0,x2:midX,y2:y1,stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"},zonesG);
+  add("line",{x1:x0,y1:thrY,x2:x1,y2:thrY,stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"},zonesG);
+  // Rahmen darüber
   add("rect",{x:x0,y:y0,width:pw,height:ph,fill:"none",stroke:"var(--line)","stroke-width":1,rx:12});
-  add("line",{x1:midX,y1:y0,x2:midX,y2:y1,stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
-  add("line",{x1:x0,y1:thrY,x2:x1,y2:thrY,stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
   text((midX+x1)/2,y0+16,"gemeinsamer Boden",{class:"zonelabel","text-anchor":"middle"});
   text((x0+midX)/2,y0+16,"getragene Ablehnung",{class:"zonelabel","text-anchor":"middle"});
   text((x0+x1)/2,y1-9,"umstritten",{class:"zonelabel","text-anchor":"middle"});
