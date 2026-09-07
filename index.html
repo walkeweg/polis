@@ -81,7 +81,19 @@
   svg.map{width:100%;height:auto;display:block;border-radius:12px;background:var(--plot);border:1px solid var(--line)}
   .axlabel{fill:var(--muted);font-size:12px;font-family:Inter;font-weight:500}
   .zonelabel{fill:var(--muted);font-size:11px;font-family:Inter;opacity:.5;letter-spacing:.02em}
-  .qlabel{fill:#fff;font-size:14px;font-weight:700;font-family:Inter;text-anchor:middle;dominant-baseline:central}
+  .qlabel{fill:#fff;font-size:12px;font-weight:700;font-family:Inter;text-anchor:middle;pointer-events:none}
+  .ringlabel{fill:var(--muted);font-size:10.5px;font-family:Inter;opacity:.55}
+  .pt{cursor:pointer}
+  .plotwrap{position:relative;margin-top:12px}
+  .tip{position:absolute;left:0;top:0;z-index:5;width:max-content;max-width:260px;pointer-events:none;opacity:0;transform:translate(-50%,-100%);transition:opacity .12s;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:9px 11px;font-size:13px;line-height:1.4}
+  .tip.below{transform:translate(-50%,0)}
+  .tip.show{opacity:1}
+  .tip b{display:block;font-weight:600;margin-bottom:3px}
+  .tip .m{color:var(--muted);font-size:12px}
+  .viewtabs{display:flex;gap:6px}
+  .viewtabs button{font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:6px 13px}
+  .viewtabs button:hover{border-color:var(--muted)}
+  .viewtabs button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--boden-bg);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:12.5px}
   .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
   .dot{width:11px;height:11px;border-radius:50%}
@@ -145,6 +157,7 @@ const SCALES={
 };
 function scaleColor(v,max){if(max===1){return {1:"var(--boden)",0:"var(--muted)","-1":"var(--umstritten)"}[v];}return {2:"var(--boden)",1:"#7bbf8f",0:"var(--muted)","-1":"var(--umstritten)","-2":"var(--einwand)"}[v];}
 const CAT={boden:{label:"Gemeinsamer Boden",color:"var(--boden)",bg:"var(--boden-bg)"},ablehnung:{label:"Getragene Ablehnung",color:"var(--ablehnung)",bg:"var(--ablehnung-bg)"},unentschieden:{label:"Einig, aber unentschieden",color:"var(--unent)",bg:"var(--unent-bg)"},umstritten:{label:"Umstritten",color:"var(--umstritten)",bg:"var(--umstritten-bg)"},einwand:{label:"Einwand offen",color:"var(--einwand)",bg:"var(--einwand-bg)"}};
+let mapView="karte";
 
 /* ---------- Statistik (Streuung statt Mittelwert) ---------- */
 function statsFor(scale,theses,votes,i){
@@ -178,7 +191,7 @@ function buildMap(scale,theses,votes){
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
   svg.setAttribute("role","img");svg.setAttribute("aria-label","Konsenskarte: Thesen nach Zustimmung und Einigkeit");
   const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
-  const text=(x,y,s,o)=>{const t=add("text",Object.assign({x,y},o||{}));t.textContent=s;return t;};
+  const text=(x,y,s,o,parent)=>{const t=add("text",Object.assign({x,y},o||{}),parent);t.textContent=s;return t;};
   // Zonenflächen, beschnitten auf die abgerundeten Ecken (sonst laufen sie über)
   const defs=add("defs",{});
   add("rect",{x:x0,y:y0,width:pw,height:ph,rx:12},add("clipPath",{id:"kkclip"},defs));
@@ -199,7 +212,7 @@ function buildMap(scale,theses,votes){
   text(x0-18,yLo,"uneinig",{class:"axlabel","text-anchor":"middle",transform:`rotate(-90 ${x0-18} ${yLo})`});
   text(x0,y1+32,"← Ablehnung",{class:"axlabel","text-anchor":"start"});
   text(x1,y1+32,"Zustimmung →",{class:"axlabel","text-anchor":"end"});
-  const R=14, minD=R*2+4;
+  const R=11, minD=R*2+4;
   const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,x:px(s.x),y:py(s.unity)});});
   for(let it=0;it<80;it++){
     for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
@@ -209,14 +222,97 @@ function buildMap(scale,theses,votes){
     pts.forEach(P=>{P.x=Math.max(x0+R,Math.min(x1-R,P.x));P.y=Math.max(y0+R,Math.min(y1-R,P.y));});
   }
   pts.forEach(P=>{
-    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:R+5,fill:"none",stroke:"var(--einwand)","stroke-width":2.6});
-    const c=add("circle",{cx:P.x,cy:P.y,r:R,fill:CAT[P.s.cat].color,stroke:"var(--card)","stroke-width":3});
-    add("title",{},c).textContent=`${P.i+1}. ${theses[P.i]}`;
-    text(P.x,P.y+0.5,String(P.i+1),{class:"qlabel","text-anchor":"middle"});
+    const g=add("g",{class:"pt",tabindex:"0",role:"img","aria-label":`These ${P.i+1}: ${theses[P.i]}`});
+    g.dataset.i=P.i;
+    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:R+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
+    add("circle",{cx:P.x,cy:P.y,r:R,fill:CAT[P.s.cat].color,stroke:"var(--card)","stroke-width":2.5},g);
+    text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em"},g);
   });
   return{svg,stats};
 }
 function legend(scale){const lg=el("div","legend");const items=[["boden","Gemeinsamer Boden"],["ablehnung","Getragene Ablehnung"],["unentschieden","Einig, unentschieden"],["umstritten","Umstritten"]];if(SCALES[scale].hasVeto)items.push(["einwand","Einwand offen"]);items.forEach(([k,l])=>{const s=el("span");const d=el("span","dot");d.style.background=CAT[k].color;s.append(d,document.createTextNode(l));lg.append(s);});return lg;}
+
+/* ---------- Zielscheibe ---------- */
+function buildTarget(scale,theses,votes){
+  const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
+  const ns="http://www.w3.org/2000/svg";
+  const W=640,H=408, cx=W/2, cy=H/2-16, maxR=160, inner=maxR-18;
+  const svg=document.createElementNS(ns,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
+  svg.setAttribute("role","img");svg.setAttribute("aria-label","Zielscheibe: Mitte heisst einig, Rand heisst uneinig");
+  const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
+  const text=(x,y,s,o,parent)=>{const t=add("text",Object.assign({x,y},o||{}),parent);t.textContent=s;return t;};
+  // Ringe: aussen uneinig, Mitte einig
+  add("circle",{cx,cy,r:maxR,fill:"var(--card)",stroke:"var(--line)","stroke-width":1});
+  add("circle",{cx,cy,r:maxR*.68,fill:"none",stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
+  add("circle",{cx,cy,r:maxR*.36,fill:"var(--boden-bg)",stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
+  add("circle",{cx,cy,r:2,fill:"var(--line)"});
+  text(cx,cy+maxR+26,"Mitte = einig · Rand = uneinig",{class:"zonelabel","text-anchor":"middle"});
+  // Punkte: Radius = Uneinigkeit, Grösse = Einigkeit, Farbe = Richtung
+  const pts=[];const voted=stats.filter(s=>s.n).length;let k=0;
+  stats.forEach((s,i)=>{
+    if(!s.n)return;
+    const pr=9+s.unity*7, r0=Math.min(inner-pr,(1-s.unity)*inner);
+    const a=-Math.PI/2+(k++)*2*Math.PI/Math.max(1,voted);
+    pts.push({i,s,pr,r0,x:cx+Math.cos(a)*r0,y:cy+Math.sin(a)*r0});
+  });
+  for(let it=0;it<120;it++){
+    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
+      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01,need=A.pr+B.pr+4;
+      if(d<need){const p=(need-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
+    }
+    // zurück auf den eigenen Ring, nur bei Gedränge weiter nach aussen
+    pts.forEach(P=>{const dx=P.x-cx,dy=P.y-cy,d=Math.hypot(dx,dy)||0.01;
+      const nr=Math.min(inner-P.pr,Math.max(P.r0,d));P.x=cx+dx/d*nr;P.y=cy+dy/d*nr;});
+  }
+  pts.forEach(P=>{
+    const x=P.s.x, w=Math.round(Math.min(1,Math.abs(x))*100);
+    const base=x>=0?"var(--boden)":"var(--einwand)";
+    const fb=x>=.2?"var(--boden)":x<=-.2?"var(--einwand)":"var(--muted)";
+    const g=add("g",{class:"pt",tabindex:"0",role:"img","aria-label":`These ${P.i+1}: ${theses[P.i]}`});
+    g.dataset.i=P.i;
+    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.pr+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
+    const c=add("circle",{cx:P.x,cy:P.y,r:P.pr,fill:fb,stroke:"var(--card)","stroke-width":2.5},g);
+    c.style.fill=`color-mix(in srgb, ${base} ${w}%, var(--muted))`;
+    text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em",style:`font-size:${Math.max(10,Math.round(P.pr*.95))}px`},g);
+  });
+  return{svg,stats};
+}
+function targetLegend(scale){
+  const lg=el("div","legend");
+  const item=(css,label)=>{const s=el("span");const d=el("span","dot");d.style.cssText=css;s.append(d,document.createTextNode(label));return s;};
+  lg.append(item("background:var(--einwand)","Ablehnung"),item("background:var(--muted)","neutral"),item("background:var(--boden)","Zustimmung"));
+  if(SCALES[scale].hasVeto)lg.append(item("background:transparent;border:2px solid var(--einwand)","Einwand offen"));
+  lg.append(el("span",null,"Nähe zur Mitte und Punktgrösse = Einigkeit"));
+  return lg;
+}
+/* ---------- Hinweisfeld beim Darüberfahren ---------- */
+function attachTips(svg,wrap,theses,stats){
+  const tip=el("div","tip");wrap.append(tip);
+  let cur=null;
+  const hide=()=>{tip.classList.remove("show");cur=null;};
+  svg.querySelectorAll("g.pt").forEach(g=>{
+    const i=+g.dataset.i, s=stats[i];
+    const show=()=>{
+      tip.textContent="";
+      tip.append(el("b",null,`${i+1}. ${theses[i]}`),
+                 el("span","m",`${CAT[s.cat].label} · ${s.n} Stimme${s.n!==1?"n":""} · Einigkeit ${Math.round(s.unity*100)}\u00a0%`));
+      tip.classList.add("show");
+      const r=g.getBoundingClientRect(),w=wrap.getBoundingClientRect(),tw=tip.offsetWidth;
+      const above=r.top-w.top>tip.offsetHeight+10;
+      tip.classList.toggle("below",!above);
+      tip.style.left=Math.max(tw/2+2,Math.min(w.width-tw/2-2,r.left-w.left+r.width/2))+"px";
+      tip.style.top=(above?r.top-w.top-8:r.bottom-w.top+8)+"px";
+      cur=g;
+    };
+    g.addEventListener("mouseenter",show);
+    g.addEventListener("mouseleave",hide);
+    g.addEventListener("focus",show);
+    g.addEventListener("blur",hide);
+    g.addEventListener("click",e=>{e.stopPropagation();cur===g?hide():show();});
+  });
+  svg.addEventListener("click",hide);
+}
 function readingText(stats,theses){
   const f=document.createDocumentFragment();const by=k=>stats.map((s,i)=>({s,i})).filter(o=>o.s.n&&o.s.cat===k).map(o=>o.i+1);const L=a=>a.length?("These "+a.join(", ")):null;const p=t=>{const e=el("p");e.textContent=t;return e;};
   const boden=by("boden"),umstr=by("umstritten"),ein=by("einwand"),unent=by("unentschieden"),abl=by("ablehnung");
@@ -401,15 +497,33 @@ function drawResults(session,votes,isAdmin,host){
   const l=el("div","live");if(isAdmin){l.append(el("span","pulse"));}l.append(document.createTextNode(`${voted} Stimme${voted!==1?"n":""}`));hl.append(l);hr.append(hl);
   head.append(hr);
   if(!voted){head.append(el("p","hint","Noch keine Stimmen. Sobald abgestimmt wird, erscheint die Karte."));host.append(head);return;}
-  const {svg,stats}=buildMap(scale,theses,votes);
+  const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
   const cnt={};Object.keys(CAT).forEach(k=>cnt[k]=0);stats.forEach(s=>{if(s.n)cnt[s.cat]++;});
   const kpis=el("div","kpis");const kpi=(n,t,col)=>{const d=el("div","kpi");const b=el("b",null,n);if(col)b.style.color=col;d.append(b,el("span",null,t));return d;};
   kpis.append(kpi(cnt.boden,"gemeinsamer Boden","var(--boden)"),kpi(cnt.umstritten,"umstritten","var(--umstritten)"));
   if(SCALES[scale].hasVeto)kpis.append(kpi(cnt.einwand,"mit offenem Einwand","var(--einwand)"));
   head.append(kpis);host.append(head);
 
-  const mapCard=el("div","card");mapCard.append(svg,legend(scale));
-  mapCard.append(Object.assign(el("p","small muted"),{textContent:"Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.",style:"margin-top:10px"}));
+  const mapCard=el("div","card");
+  const mhead=el("div","row spread");
+  mhead.append(Object.assign(el("h3",null,"Übersicht"),{style:"font-size:15px"}));
+  const tabs=el("div","viewtabs"),btns={};
+  const wrap=el("div","plotwrap"),lgHost=el("div");
+  const cap=Object.assign(el("p","small muted"),{style:"margin-top:10px"});
+  const CAPS={karte:"Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.",
+              ziel:"Zielscheibe: Je näher an der Mitte und je grösser der Punkt, desto einiger ist die Gruppe. Die Farbe zeigt die Richtung: rot heisst Ablehnung, teal heisst Zustimmung."};
+  const renderMap=()=>{
+    wrap.textContent="";lgHost.textContent="";
+    const built=mapView==="ziel"?buildTarget(scale,theses,votes):buildMap(scale,theses,votes);
+    wrap.append(built.svg);attachTips(built.svg,wrap,theses,stats);
+    lgHost.append(mapView==="ziel"?targetLegend(scale):legend(scale));
+    cap.textContent=CAPS[mapView];
+    for(const k in btns)btns[k].setAttribute("aria-pressed",String(k===mapView));
+  };
+  [["karte","Karte"],["ziel","Zielscheibe"]].forEach(([k,l])=>{
+    const b=el("button",null,l);b.type="button";btns[k]=b;b.onclick=()=>{mapView=k;renderMap();};tabs.append(b);
+  });
+  mhead.append(tabs);mapCard.append(mhead,wrap,lgHost,cap);renderMap();
   host.append(mapCard);
 
   const rd=el("div","card reading");rd.append(Object.assign(el("h3",null,"Lesart"),{style:"font-size:15px;margin-bottom:8px"}));rd.append(readingText(stats,theses));host.append(rd);
