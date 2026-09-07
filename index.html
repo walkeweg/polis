@@ -177,6 +177,40 @@ function statsFor(scale,theses,votes,i){
   return{n,mean,sd,x,unity,veto,dist,cat};
 }
 
+/* ---------- Punkte entzerren ----------
+   Zwei Punkte dürfen sich nie überdecken. Erst werden sie auseinander-
+   geschoben, danach setzt eine Spiralsuche jeden Rest auf den nächsten
+   freien Platz. clamp hält jeden Punkt in seinem erlaubten Bereich. */
+function resolveOverlaps(pts,gap,clamp){
+  const need=(A,B)=>A.r+B.r+gap;
+  for(let it=0;it<200;it++){
+    let moved=false;
+    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
+      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy),nd=need(A,B);
+      if(d>=nd-0.01)continue;
+      if(d<0.01){const ang=a*2.399+b;dx=Math.cos(ang);dy=Math.sin(ang);d=1;}
+      const p=(nd-d)/2,ux=dx/d,uy=dy/d;
+      A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;moved=true;
+    }
+    pts.forEach(clamp);
+    if(!moved)break;
+  }
+  const free=(P,x,y)=>pts.every(Q=>Q===P||Math.hypot(Q.x-x,Q.y-y)>=need(P,Q)-0.01);
+  pts.forEach(P=>{
+    if(free(P,P.x,P.y))return;
+    const sx=P.x,sy=P.y;
+    for(let step=1;step<=120;step++){
+      const rad=step*3,n=Math.max(10,Math.round(rad*0.9));
+      for(let k=0;k<n;k++){
+        const ang=k*2*Math.PI/n+step*0.7;
+        const t={r:P.r,r0:P.r0,x:sx+Math.cos(ang)*rad,y:sy+Math.sin(ang)*rad};
+        clamp(t);
+        if(free(P,t.x,t.y)){P.x=t.x;P.y=t.y;return;}
+      }
+    }
+  });
+}
+
 /* ---------- Karte ---------- */
 function buildMap(scale,theses,votes){
   const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
@@ -212,20 +246,17 @@ function buildMap(scale,theses,votes){
   text(x0-18,yLo,"uneinig",{class:"axlabel","text-anchor":"middle",transform:`rotate(-90 ${x0-18} ${yLo})`});
   text(x0,y1+32,"← Ablehnung",{class:"axlabel","text-anchor":"start"});
   text(x1,y1+32,"Zustimmung →",{class:"axlabel","text-anchor":"end"});
-  const R=11, minD=R*2+4;
-  const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,x:px(s.x),y:py(s.unity)});});
-  for(let it=0;it<80;it++){
-    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
-      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01;
-      if(d<minD){const p=(minD-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
-    }
-    pts.forEach(P=>{P.x=Math.max(x0+R,Math.min(x1-R,P.x));P.y=Math.max(y0+R,Math.min(y1-R,P.y));});
-  }
+  const R=11;
+  const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,dr:R,r:R+(s.veto>0?4:0),x:px(s.x),y:py(s.unity)});});
+  resolveOverlaps(pts,4,P=>{
+    P.x=Math.max(x0+P.r+2,Math.min(x1-P.r-2,P.x));
+    P.y=Math.max(y0+P.r+2,Math.min(y1-P.r-2,P.y));
+  });
   pts.forEach(P=>{
     const g=add("g",{class:"pt",tabindex:"0",role:"img","aria-label":`These ${P.i+1}: ${theses[P.i]}`});
     g.dataset.i=P.i;
-    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:R+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
-    add("circle",{cx:P.x,cy:P.y,r:R,fill:CAT[P.s.cat].color,stroke:"var(--card)","stroke-width":2.5},g);
+    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.dr+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
+    add("circle",{cx:P.x,cy:P.y,r:P.dr,fill:CAT[P.s.cat].color,stroke:"var(--card)","stroke-width":2.5},g);
     text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em"},g);
   });
   return{svg,stats};
@@ -254,27 +285,24 @@ function buildTarget(scale,theses,votes){
     if(!s.n)return;
     const pr=9+s.unity*7, r0=Math.min(inner-pr,(1-s.unity)*inner);
     const a=-Math.PI/2+(k++)*2*Math.PI/Math.max(1,voted);
-    pts.push({i,s,pr,r0,x:cx+Math.cos(a)*r0,y:cy+Math.sin(a)*r0});
+    pts.push({i,s,dr:pr,r:pr+(s.veto>0?4:0),r0,x:cx+Math.cos(a)*r0,y:cy+Math.sin(a)*r0});
   });
-  for(let it=0;it<120;it++){
-    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
-      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01,need=A.pr+B.pr+4;
-      if(d<need){const p=(need-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
-    }
-    // zurück auf den eigenen Ring, nur bei Gedränge weiter nach aussen
-    pts.forEach(P=>{const dx=P.x-cx,dy=P.y-cy,d=Math.hypot(dx,dy)||0.01;
-      const nr=Math.min(inner-P.pr,Math.max(P.r0,d));P.x=cx+dx/d*nr;P.y=cy+dy/d*nr;});
-  }
+  // nie näher zur Mitte als der eigene Ring, nur bei Gedränge weiter nach aussen
+  resolveOverlaps(pts,4,P=>{
+    const dx=P.x-cx,dy=P.y-cy,d=Math.hypot(dx,dy);
+    if(d<0.001){if(P.r0>0.001){P.x=cx;P.y=cy-P.r0;}return;}
+    const nr=Math.min(inner-P.r,Math.max(P.r0,d));P.x=cx+dx/d*nr;P.y=cy+dy/d*nr;
+  });
   pts.forEach(P=>{
     const x=P.s.x, w=Math.round(Math.min(1,Math.abs(x))*100);
     const base=x>=0?"var(--boden)":"var(--einwand)";
     const fb=x>=.2?"var(--boden)":x<=-.2?"var(--einwand)":"var(--muted)";
     const g=add("g",{class:"pt",tabindex:"0",role:"img","aria-label":`These ${P.i+1}: ${theses[P.i]}`});
     g.dataset.i=P.i;
-    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.pr+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
-    const c=add("circle",{cx:P.x,cy:P.y,r:P.pr,fill:fb,stroke:"var(--card)","stroke-width":2.5},g);
+    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.dr+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
+    const c=add("circle",{cx:P.x,cy:P.y,r:P.dr,fill:fb,stroke:"var(--card)","stroke-width":2.5},g);
     c.style.fill=`color-mix(in srgb, ${base} ${w}%, var(--muted))`;
-    text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em",style:`font-size:${Math.max(10,Math.round(P.pr*.95))}px`},g);
+    text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em",style:`font-size:${Math.max(10,Math.round(P.dr*.95))}px`},g);
   });
   return{svg,stats};
 }
