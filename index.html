@@ -1,0 +1,395 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Konsenskarte</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+
+<!-- ==================================================================== -->
+<!-- KONFIGURATION  —  hier deine beiden Supabase-Schlüssel eintragen.     -->
+<!-- Zu finden im Supabase-Dashboard unter  Project Settings → API.        -->
+<!-- ==================================================================== -->
+<script>
+  const SUPABASE_URL      = "";   // z. B. https://abcd1234.supabase.co
+  const SUPABASE_ANON_KEY = "";   // der lange "anon public" Schlüssel
+</script>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+
+<style>
+  :root{
+    --paper:#eef1f4; --card:#ffffff; --ink:#12181f; --muted:#5b6672;
+    --line:#d3dae1; --line-soft:#e5eaef;
+    --boden:#2f8f6b; --boden-bg:#e4f2ec;
+    --ablehnung:#5f6b8a; --ablehnung-bg:#e8eaf1;
+    --unent:#b8842a; --unent-bg:#f6eddc;
+    --umstritten:#c56a3c; --umstritten-bg:#f6e6dc;
+    --einwand:#c0392b; --einwand-bg:#f7e2df;
+    --accent:#1f6f57;
+    --shadow:0 1px 2px rgba(16,24,31,.06),0 8px 24px rgba(16,24,31,.06);
+    --r:14px; --plot:#f8fafb;
+  }
+  @media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+    --paper:#0e1216;--card:#171d24;--ink:#eaf0f5;--muted:#9aa7b3;--line:#2a333c;--line-soft:#222a32;
+    --boden:#54c79b;--boden-bg:#12332a;--ablehnung:#9aa6cc;--ablehnung-bg:#1b2033;--unent:#e0b25f;--unent-bg:#2b2412;
+    --umstritten:#e08a5c;--umstritten-bg:#33210f;--einwand:#e8695b;--einwand-bg:#33150f;--accent:#54c79b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);--plot:#10161c;}}
+  :root[data-theme="dark"]{
+    --paper:#0e1216;--card:#171d24;--ink:#eaf0f5;--muted:#9aa7b3;--line:#2a333c;--line-soft:#222a32;
+    --boden:#54c79b;--boden-bg:#12332a;--ablehnung:#9aa6cc;--ablehnung-bg:#1b2033;--unent:#e0b25f;--unent-bg:#2b2412;
+    --umstritten:#e08a5c;--umstritten-bg:#33210f;--einwand:#e8695b;--einwand-bg:#33150f;--accent:#54c79b;
+    --shadow:0 1px 2px rgba(0,0,0,.4),0 10px 30px rgba(0,0,0,.35);--plot:#10161c;}
+  *{box-sizing:border-box}html,body{margin:0}
+  body{background:var(--paper);color:var(--ink);font-family:Inter,system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;line-height:1.5;-webkit-font-smoothing:antialiased}
+  h1,h2,h3{font-family:"Bricolage Grotesque",Inter,system-ui,sans-serif;line-height:1.1;margin:0;font-weight:700}
+  .wrap{max-width:820px;margin:0 auto;padding:22px 18px 120px}
+  header.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px;flex-wrap:wrap}
+  .brand{display:flex;align-items:center;gap:10px}.brand h1{font-size:26px;letter-spacing:-.02em}.brand .mark{width:22px;height:22px}
+  .tagline{color:var(--muted);font-size:13.5px;margin:2px 0 20px}
+  .themebtn{background:none;border:1px solid var(--line);color:var(--muted);border-radius:999px;padding:6px 12px;font-size:12.5px;cursor:pointer}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:var(--r);box-shadow:var(--shadow);padding:20px}
+  .card + .card{margin-top:16px}
+  label.field{display:block;margin:0 0 14px}label.field>span{display:block;font-size:13px;color:var(--muted);margin-bottom:6px}
+  input[type=text],textarea,select{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:11px 12px}
+  textarea{resize:vertical;min-height:150px;line-height:1.55}
+  input:focus,textarea:focus,select:focus,button:focus-visible,.opt:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+  .btn{font:inherit;font-weight:600;cursor:pointer;border-radius:10px;padding:11px 16px;border:1px solid transparent;background:var(--accent);color:#fff}
+  .btn:hover{filter:brightness(1.05)}.btn.ghost{background:transparent;color:var(--ink);border-color:var(--line)}
+  .btn.ghost:hover{border-color:var(--muted)}.btn.small{padding:7px 12px;font-size:13px}
+  .btn.danger{background:transparent;color:var(--einwand);border-color:var(--line)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.spread{justify-content:space-between}
+  .muted{color:var(--muted)}.small{font-size:13px}
+  .qcard{border:1px solid var(--line);border-radius:12px;padding:14px 15px;margin:0 0 12px;background:var(--card)}
+  .qcard .qtext{font-size:16px;font-weight:500;margin-bottom:11px}
+  .qnum{color:var(--muted);font-variant-numeric:tabular-nums;font-weight:600;margin-right:8px}
+  .opts{display:flex;gap:8px;flex-wrap:wrap}
+  .opt{flex:1 1 auto;min-width:64px;text-align:center;border:1px solid var(--line);background:var(--paper);border-radius:10px;padding:9px 8px;cursor:pointer;font:inherit;font-size:13px;color:var(--ink)}
+  .opt .g{display:block;font-size:16px;font-weight:700;margin-bottom:2px;font-family:"Bricolage Grotesque",sans-serif}
+  .opt[aria-pressed="true"]{border-color:var(--accent);background:var(--boden-bg);box-shadow:inset 0 0 0 1px var(--accent)}
+  .opt[data-neg="1"][aria-pressed="true"]{background:var(--umstritten-bg);box-shadow:inset 0 0 0 1px var(--umstritten)}
+  .opt[data-block="1"][aria-pressed="true"]{background:var(--einwand-bg);box-shadow:inset 0 0 0 1px var(--einwand)}
+  .bar{position:fixed;left:0;right:0;bottom:0;background:var(--card);border-top:1px solid var(--line);padding:12px 16px;z-index:20}
+  .bar .inner{max-width:820px;margin:0 auto;width:100%;display:flex;gap:12px;align-items:center;justify-content:space-between}
+  .progress{font-size:13px;color:var(--muted)}
+  .hint{font-size:12.5px;color:var(--muted);background:var(--paper);border:1px dashed var(--line);border-radius:10px;padding:10px 12px}
+  .hidden{display:none!important}
+  svg.map{width:100%;height:auto;display:block;border-radius:12px;background:var(--plot);border:1px solid var(--line)}
+  .axlabel{fill:var(--muted);font-size:3.1px;font-family:Inter}
+  .qlabel{fill:#fff;font-size:3.4px;font-weight:600;font-family:Inter;text-anchor:middle;dominant-baseline:central}
+  .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:12.5px}
+  .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
+  .dot{width:11px;height:11px;border-radius:50%}
+  .kpis{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 2px}
+  .kpi{flex:1 1 120px;border:1px solid var(--line);border-radius:12px;padding:12px 14px;background:var(--card)}
+  .kpi b{font-family:"Bricolage Grotesque";font-size:24px;display:block}.kpi span{font-size:12px;color:var(--muted)}
+  .reading p{margin:.5em 0}
+  .tlist{list-style:none;margin:14px 0 0;padding:0}
+  .titem{border:1px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:10px}
+  .titem .th{display:flex;gap:10px;align-items:flex-start;justify-content:space-between}
+  .titem .cat{font-size:11.5px;font-weight:600;padding:3px 9px;border-radius:999px;white-space:nowrap}
+  .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:10px;border:1px solid var(--line-soft)}
+  .stack i{display:block;height:100%}
+  .disttags{font-size:11.5px;color:var(--muted);margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+  .linkbox{display:flex;gap:8px;align-items:center;margin-top:8px}
+  .linkbox input{font-size:12.5px}
+  .qrbox{display:flex;justify-content:center;padding:16px;background:#fff;border-radius:12px;border:1px solid var(--line);margin-top:12px}
+  .qrbox img,.qrbox canvas{display:block}
+  .big{font-size:40px;font-family:"Bricolage Grotesque";font-weight:700;color:var(--accent)}
+  .center{text-align:center;padding:36px 10px}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:12.5px;color:var(--muted)}
+  .live .pulse{width:8px;height:8px;border-radius:50%;background:var(--boden);box-shadow:0 0 0 0 rgba(47,143,107,.6);animation:pulse 2s infinite}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(47,143,107,.5)}70%{box-shadow:0 0 0 7px rgba(47,143,107,0)}100%{box-shadow:0 0 0 0 rgba(47,143,107,0)}}
+  pre.sql{background:var(--ink);color:#e6edf3;padding:14px;border-radius:10px;overflow:auto;font-size:12px;line-height:1.5}
+  .toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%);background:var(--ink);color:var(--paper);padding:9px 16px;border-radius:999px;font-size:13px;opacity:0;transition:opacity .2s;pointer-events:none;z-index:40}
+  .toast.show{opacity:1}
+  @media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+  @media print{.top .themebtn,.bar,.noprint{display:none!important}body{background:#fff}.wrap{padding:0}.card{box-shadow:none}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/><circle cx="15.5" cy="8.5" r="1.6" fill="var(--accent)" stroke="none"/><circle cx="8.5" cy="9" r="1.6" fill="var(--accent)" stroke="none"/><circle cx="12.5" cy="15.5" r="1.6" fill="var(--boden)" stroke="none"/></svg>
+      <h1>Konsenskarte</h1>
+    </div>
+    <button class="themebtn" id="themebtn">Ansicht</button>
+  </header>
+  <p class="tagline">Zeigt, wo eine Gruppe gemeinsamen Boden hat und wo sie auseinandergeht. Kein Mehrheitsentscheid.</p>
+  <main id="app"></main>
+</div>
+<div class="toast" id="toast"></div>
+
+<script>
+"use strict";
+const $=s=>document.querySelector(s);
+const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;};
+const app=$("#app");
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1700);}
+$("#themebtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme");const d=matchMedia("(prefers-color-scheme:dark)").matches;document.documentElement.setAttribute("data-theme",c?(c==="dark"?"light":"dark"):(d?"light":"dark"));};
+
+/* ---------- Skalen & Kategorien ---------- */
+const SCALES={
+  consent5:{max:2,hasVeto:true,blockVal:-2,
+    opts:[{v:2,g:"++",label:"Volle Zustimmung"},{v:1,g:"+",label:"Zustimmung, kleine Vorbehalte"},{v:0,g:"o",label:"Neutral / enthalte mich"},{v:-1,g:"–",label:"Bedenken"},{v:-2,g:"✕",label:"Einwand (blockiert)"}],
+    hint:"Konsent heisst nicht «Mehrheit dafür», sondern «kein schwerwiegender Einwand». Ein einziger Einwand wird eigens markiert."},
+  thumb3:{max:1,hasVeto:false,blockVal:null,
+    opts:[{v:1,g:"+",label:"Dafür"},{v:0,g:"o",label:"Neutral"},{v:-1,g:"–",label:"Dagegen"}],
+    hint:"Schnell und niederschwellig, gut für jüngere Klassen. Richtung und Streuung, aber kein blockierendes Veto."}
+};
+function scaleColor(v,max){if(max===1){return {1:"var(--boden)",0:"var(--muted)","-1":"var(--umstritten)"}[v];}return {2:"var(--boden)",1:"#7bbf8f",0:"var(--muted)","-1":"var(--umstritten)","-2":"var(--einwand)"}[v];}
+const CAT={boden:{label:"Gemeinsamer Boden",color:"var(--boden)",bg:"var(--boden-bg)"},ablehnung:{label:"Getragene Ablehnung",color:"var(--ablehnung)",bg:"var(--ablehnung-bg)"},unentschieden:{label:"Einig, aber unentschieden",color:"var(--unent)",bg:"var(--unent-bg)"},umstritten:{label:"Umstritten",color:"var(--umstritten)",bg:"var(--umstritten-bg)"},einwand:{label:"Einwand offen",color:"var(--einwand)",bg:"var(--einwand-bg)"}};
+
+/* ---------- Statistik (Streuung statt Mittelwert) ---------- */
+function statsFor(scale,theses,votes,i){
+  const rs=votes.map(v=>v.ratings[i]).filter(r=>r!=null);const sc=SCALES[scale],n=rs.length;
+  if(!n)return{n:0};
+  const mean=rs.reduce((a,b)=>a+b,0)/n;
+  const sd=Math.sqrt(rs.reduce((a,b)=>a+(b-mean)*(b-mean),0)/n);
+  const x=mean/sc.max, unity=Math.max(0,Math.min(1,1-sd/sc.max));
+  const veto=sc.hasVeto?rs.filter(r=>r===sc.blockVal).length:0;
+  const dist={};sc.opts.forEach(o=>dist[o.v]=0);rs.forEach(r=>dist[r]++);
+  let cat;
+  if(veto>0)cat="einwand";
+  else if(unity>=0.60&&x>=0.35)cat="boden";
+  else if(unity>=0.60&&x<=-0.35)cat="ablehnung";
+  else if(unity>=0.60)cat="unentschieden";
+  else cat="umstritten";
+  return{n,mean,sd,x,unity,veto,dist,cat};
+}
+
+/* ---------- Karte ---------- */
+function buildMap(scale,theses,votes){
+  const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
+  const ns="http://www.w3.org/2000/svg",W=100,H=100,m=9;
+  const px=x=>m+((x+1)/2)*(W-2*m),py=u=>m+(1-u)*(H-2*m);
+  const svg=document.createElementNS(ns,"svg");svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
+  svg.setAttribute("role","img");svg.setAttribute("aria-label","Konsenskarte");
+  const rect=(x,y,w,h,f)=>{const r=document.createElementNS(ns,"rect");r.setAttribute("x",x);r.setAttribute("y",y);r.setAttribute("width",w);r.setAttribute("height",h);r.setAttribute("fill",f);svg.append(r);};
+  const line=(a,b,c,d)=>{const l=document.createElementNS(ns,"line");l.setAttribute("x1",a);l.setAttribute("y1",b);l.setAttribute("x2",c);l.setAttribute("y2",d);l.setAttribute("stroke","var(--line)");l.setAttribute("stroke-width",".3");svg.append(l);};
+  const txt=(x,y,s,cls,an)=>{const t=document.createElementNS(ns,"text");t.setAttribute("x",x);t.setAttribute("y",y);t.setAttribute("class",cls||"axlabel");if(an)t.setAttribute("text-anchor",an);t.textContent=s;svg.append(t);};
+  const midX=px(0),topY=py(1),botY=py(0),midY=py(.6),L=px(-1),R=px(1);
+  rect(midX,topY,R-midX,midY-topY,"var(--boden-bg)");rect(L,topY,midX-L,midY-topY,"var(--ablehnung-bg)");rect(L,midY,R-L,botY-midY,"var(--umstritten-bg)");
+  line(midX,topY,midX,botY);line(L,midY,R,midY);
+  txt(R,botY+4,"Zustimmung →",null,"end");txt(L,botY+4,"← Ablehnung");txt(L-1,topY+1,"einig");txt(L-1,botY-1,"uneinig");
+  stats.forEach((s,i)=>{if(!s.n)return;const x=px(s.x),y=py(s.unity);
+    if(s.veto>0){const rr=document.createElementNS(ns,"circle");rr.setAttribute("cx",x);rr.setAttribute("cy",y);rr.setAttribute("r","3.9");rr.setAttribute("fill","none");rr.setAttribute("stroke","var(--einwand)");rr.setAttribute("stroke-width",".9");svg.append(rr);}
+    const c=document.createElementNS(ns,"circle");c.setAttribute("cx",x);c.setAttribute("cy",y);c.setAttribute("r","2.9");c.setAttribute("fill",CAT[s.cat].color);
+    const ti=document.createElementNS(ns,"title");ti.textContent=`${i+1}. ${theses[i]}`;c.append(ti);svg.append(c);
+    txt(x,y+.15,String(i+1),"qlabel","middle");});
+  return{svg,stats};
+}
+function legend(scale){const lg=el("div","legend");const items=[["boden","Gemeinsamer Boden"],["ablehnung","Getragene Ablehnung"],["unentschieden","Einig, unentschieden"],["umstritten","Umstritten"]];if(SCALES[scale].hasVeto)items.push(["einwand","Einwand offen"]);items.forEach(([k,l])=>{const s=el("span");const d=el("span","dot");d.style.background=CAT[k].color;s.append(d,document.createTextNode(l));lg.append(s);});return lg;}
+function readingText(stats,theses){
+  const f=document.createDocumentFragment();const by=k=>stats.map((s,i)=>({s,i})).filter(o=>o.s.n&&o.s.cat===k).map(o=>o.i+1);const L=a=>a.length?("These "+a.join(", ")):null;const p=t=>{const e=el("p");e.textContent=t;return e;};
+  const boden=by("boden"),umstr=by("umstritten"),ein=by("einwand"),unent=by("unentschieden"),abl=by("ablehnung");
+  if(boden.length)f.append(p(`Gemeinsamer Boden liegt bei ${L(boden)}. Hier trägt die Gruppe mit.`));else f.append(p("Noch keine These mit klarem gemeinsamem Boden. Kein Scheitern, sondern ein Befund: Der Dialog steht erst am Anfang."));
+  if(abl.length)f.append(p(`Einig in der Ablehnung ist die Gruppe bei ${L(abl)}. Auch das ist Konsent, mit umgekehrtem Vorzeichen.`));
+  if(ein.length)f.append(p(`Ein offener Einwand liegt bei ${L(ein)}. Im Konsent-Prinzip blockiert das, egal wie viele zustimmen. Zuerst besprechen: Woran hakt es, und wie liesse sich die These ändern, dass der Einwand entfällt?`));
+  if(umstr.length)f.append(p(`Umstritten und gesprächsbedürftig sind ${L(umstr)}. Ein Durchschnitt in der Mitte kann Gleichgültigkeit oder eine gespaltene Gruppe heissen. Diese Thesen stehen unten, weil die Streuung gross ist, nicht weil alle neutral wären.`));
+  if(unent.length)f.append(p(`Einig, aber ohne klare Richtung ist die Gruppe bei ${L(unent)}. Frage: Ist die These relevant, oder fehlt Information?`));
+  return f;
+}
+function thesisItem(text,i,s,scale){const sc=SCALES[scale];const li=el("li","titem");const th=el("div","th");const left=el("div");left.append(Object.assign(el("span","qnum"),{textContent:(i+1)+"."}),document.createTextNode(" "+text));const cat=el("span","cat");cat.textContent=CAT[s.cat].label;cat.style.color=CAT[s.cat].color;cat.style.background=CAT[s.cat].bg;th.append(left,cat);li.append(th);const stack=el("div","stack");sc.opts.forEach(o=>{const seg=el("i");seg.style.width=((s.dist[o.v]||0)/s.n*100)+"%";seg.style.background=scaleColor(o.v,sc.max);seg.title=`${o.label}: ${s.dist[o.v]||0}`;stack.append(seg);});li.append(stack);const tags=el("div","disttags");sc.opts.forEach(o=>{if(s.dist[o.v])tags.append(el("span",null,`${o.g} ${o.label}: ${s.dist[o.v]}`));});li.append(tags);return li;}
+
+/* ---------- Supabase ---------- */
+let sb=null;
+function configured(){return SUPABASE_URL&&SUPABASE_ANON_KEY;}
+function initSB(){if(configured()&&window.supabase){sb=window.supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);return true;}return false;}
+function rnd(n,chars){chars=chars||"ABCDEFGHJKLMNPQRSTUVWXYZ23456789";let s="";const a=crypto.getRandomValues(new Uint32Array(n));for(let i=0;i<n;i++)s+=chars[a[i]%chars.length];return s;}
+function baseURL(){return location.origin+location.pathname;}
+
+/* ---------- Router ---------- */
+async function route(){
+  if(!configured()){return renderSetup();}
+  if(!initSB()){app.innerHTML="";app.append(el("div","card","Supabase-Bibliothek konnte nicht geladen werden. Internetverbindung prüfen."));return;}
+  const p=new URLSearchParams(location.search);const code=p.get("s"),key=p.get("k");
+  if(!code)return renderCreate();
+  const {data,error}=await sb.from("sessions").select("*").eq("code",code).maybeSingle();
+  if(error||!data){app.innerHTML="";app.append(el("div","card","Diese Runde gibt es nicht (mehr). Prüfe den Link."));return;}
+  if(key&&key===data.admin_key)return renderAdmin(data);
+  return renderVote(data);
+}
+
+/* ---------- SETUP (nur wenn Schlüssel fehlen) ---------- */
+function renderSetup(){
+  app.innerHTML="";
+  const c=el("div","card");
+  c.append(Object.assign(el("h2",null,"Einmalige Einrichtung"),{style:"font-size:19px;margin-bottom:10px"}));
+  c.append(el("p","muted small","Diese Datei braucht einen Ort, an dem die Stimmen online liegen. Das ist in etwa zehn Minuten erledigt und danach nie wieder nötig."));
+  const steps=[
+    "Auf supabase.com ein kostenloses Konto anlegen und ein neues Projekt erstellen.",
+    "Im Projekt links auf «SQL Editor», den folgenden Block einfügen und ausführen:",
+    "Danach unter «Project Settings → API» die «Project URL» und den «anon public» Schlüssel kopieren.",
+    "Beide oben in dieser Datei bei SUPABASE_URL und SUPABASE_ANON_KEY eintragen, speichern.",
+    "Datei auf einen Webspace legen (Schulserver, Netlify, Cloudflare Pages …). Fertig."
+  ];
+  const ol=el("div");steps.forEach((t,i)=>{const row=el("p");row.style.margin=".5em 0";row.append(Object.assign(el("b",null,(i+1)+". "),{style:"color:var(--accent)"}),document.createTextNode(t));ol.append(row);if(i===1){const pre=el("pre","sql");pre.textContent=SQL;ol.append(pre);}});
+  c.append(ol);app.append(c);
+}
+const SQL=`create table sessions (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  title text,
+  scale text not null default 'consent5',
+  theses jsonb not null,
+  admin_key text not null,
+  is_open boolean not null default true,
+  created_at timestamptz default now()
+);
+create table votes (
+  id uuid primary key default gen_random_uuid(),
+  session_id uuid references sessions(id) on delete cascade,
+  ratings jsonb not null,
+  created_at timestamptz default now()
+);
+alter table sessions enable row level security;
+alter table votes enable row level security;
+create policy "read sessions"  on sessions for select using (true);
+create policy "make sessions"  on sessions for insert with check (true);
+create policy "edit sessions"  on sessions for update using (true);
+create policy "read votes"     on votes    for select using (true);
+create policy "cast votes"     on votes    for insert with check (true);
+create policy "clear votes"    on votes    for delete using (true);
+-- Live-Aktualisierung einschalten:
+alter publication supabase_realtime add table votes;`;
+
+/* ---------- CREATE ---------- */
+function renderCreate(){
+  app.innerHTML="";
+  const c=el("div","card");
+  c.append(Object.assign(el("h2",null,"Neue Runde"),{style:"font-size:19px;margin-bottom:14px"}));
+  const name=el("input");name.type="text";name.placeholder="z. B. Regeln fürs Klassenzimmer";
+  const th=el("textarea");th.placeholder="Eine These pro Zeile.\nWir beginnen jede Sitzung pünktlich.\nHandys bleiben im Unterricht in der Tasche.";
+  const sel=el("select");sel.innerHTML='<option value="consent5">Konsent (5 Stufen, mit Einwand)</option><option value="thumb3">Einfach (3 Stufen)</option>';
+  const hint=el("p","hint");hint.textContent=SCALES.consent5.hint;sel.onchange=()=>hint.textContent=SCALES[sel.value].hint;
+  const f1=el("label","field");f1.append(el("span",null,"Titel der Runde"),name);
+  const f2=el("label","field");f2.append(el("span",null,"Thesen, denen man zustimmen oder widersprechen kann"),th);
+  const f3=el("label","field");f3.append(el("span",null,"Skala"),sel);
+  c.append(f1,f2,f3,hint);
+  const go=el("button","btn","Runde erstellen");go.style.marginTop="16px";
+  go.onclick=async()=>{
+    const theses=th.value.split("\n").map(t=>t.trim()).filter(Boolean);
+    if(!theses.length){toast("Mindestens eine These");return;}
+    go.disabled=true;go.textContent="Wird erstellt …";
+    const code=rnd(6),admin_key=rnd(16);
+    const {error}=await sb.from("sessions").insert({code,title:name.value.trim(),scale:sel.value,theses,admin_key});
+    if(error){toast("Fehler beim Erstellen");go.disabled=false;go.textContent="Runde erstellen";return;}
+    location.href=baseURL()+"?s="+code+"&k="+admin_key;
+  };
+  c.append(go);app.append(c);
+}
+
+/* ---------- VOTE (Teilnahme-Link, ohne Registrierung) ---------- */
+function renderVote(session){
+  app.innerHTML="";
+  const votedKey="kk_voted_"+session.code;
+  if(localStorage.getItem(votedKey)){return renderThanks(session,true);}
+  if(!session.is_open){app.append(el("div","card","Diese Runde ist geschlossen. Es kann nicht mehr abgestimmt werden."));return;}
+  const sc=SCALES[session.scale];const draft=new Array(session.theses.length).fill(null);
+  const head=el("div","card");head.style.marginBottom="14px";
+  head.append(Object.assign(el("h2",null,session.title||"Abstimmung"),{style:"font-size:18px"}));
+  head.append(el("div","small muted","Deine Stimme ist anonym. Du stimmst einmal ab."));
+  app.append(head);
+  session.theses.forEach((t,i)=>{
+    const q=el("div","qcard");
+    const qt=el("div","qtext");qt.append(Object.assign(el("span","qnum"),{textContent:(i+1)+"."}),document.createTextNode(" "+t));q.append(qt);
+    const opts=el("div","opts");
+    sc.opts.forEach(o=>{const b=el("button","opt");b.type="button";if(o.v<0)b.dataset.neg="1";if(sc.hasVeto&&o.v===sc.blockVal)b.dataset.block="1";b.setAttribute("aria-pressed","false");b.title=o.label;b.append(Object.assign(el("span","g"),{textContent:o.g}));b.append(document.createTextNode(o.label));b.onclick=()=>{draft[i]=o.v;opts.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-pressed","false"));b.setAttribute("aria-pressed","true");upd();};opts.append(b);});
+    q.append(opts);app.append(q);
+  });
+  const bar=el("div","bar noprint");const inner=el("div","inner");const prog=el("div","progress");const send=el("button","btn","Abstimmen");
+  inner.append(prog,send);bar.append(inner);document.body.append(bar);
+  function upd(){const done=draft.filter(x=>x!=null).length;prog.textContent=`${done} von ${draft.length} beantwortet`;send.disabled=done<draft.length;}
+  upd();
+  send.onclick=async()=>{send.disabled=true;send.textContent="Sende …";
+    const {error}=await sb.from("votes").insert({session_id:session.id,ratings:draft});
+    if(error){toast("Senden fehlgeschlagen");send.disabled=false;send.textContent="Abstimmen";return;}
+    try{localStorage.setItem(votedKey,"1");}catch(e){}
+    bar.remove();renderThanks(session,false);
+  };
+}
+function renderThanks(session,already){
+  app.innerHTML="";
+  const c=el("div","card center");
+  c.append(el("div","big","Danke"));
+  c.append(el("p","muted",already?"Du hast bei dieser Runde bereits abgestimmt.":"Deine Stimme ist erfasst."));
+  const b=el("button","btn ghost","Ergebnis ansehen");b.style.marginTop="8px";
+  b.onclick=()=>renderResultsView(session,false);
+  c.append(b);app.append(c);
+}
+
+/* ---------- Ergebnis-Ansicht (für Teilnehmende nach dem Voten) ---------- */
+async function renderResultsView(session,isAdmin){
+  app.innerHTML="";
+  const {data:votes}=await sb.from("votes").select("ratings").eq("session_id",session.id);
+  drawResults(session,votes||[],isAdmin);
+}
+
+/* ---------- ADMIN (Leitungs-Link, live) ---------- */
+function renderAdmin(session){
+  app.innerHTML="";
+  let votes=[];
+  const shareURL=baseURL()+"?s="+session.code;
+
+  const linkCard=el("div","card noprint");
+  linkCard.append(Object.assign(el("h2",null,session.title||"Runde"),{style:"font-size:19px"}));
+  linkCard.append(el("p","small muted","Diesen Link oder QR-Code verteilen. Wer ihn öffnet, stimmt einmal ab, ohne Anmeldung."));
+  const lb=el("div","linkbox");const inp=el("input");inp.type="text";inp.readOnly=true;inp.value=shareURL;const cp=el("button","btn small","Kopieren");cp.onclick=()=>{inp.select();navigator.clipboard&&navigator.clipboard.writeText(shareURL);toast("Link kopiert");};lb.append(inp,cp);linkCard.append(lb);
+  const qr=el("div","qrbox");linkCard.append(qr);
+  try{if(window.QRCode){new QRCode(qr,{text:shareURL,width:172,height:172,correctLevel:QRCode.CorrectLevel.M});}}catch(e){}
+  const ctrl=el("div","row");ctrl.style.marginTop="14px";
+  const closeBtn=el("button","btn ghost small",session.is_open?"Runde schliessen":"Runde öffnen");
+  closeBtn.onclick=async()=>{const ns=!session.is_open;await sb.from("sessions").update({is_open:ns}).eq("code",session.code);session.is_open=ns;closeBtn.textContent=ns?"Runde schliessen":"Runde öffnen";toast(ns?"Runde offen":"Runde geschlossen");};
+  const resetBtn=el("button","btn danger small","Stimmen zurücksetzen");
+  resetBtn.onclick=async()=>{if(!confirm("Alle Stimmen dieser Runde löschen?"))return;await sb.from("votes").delete().eq("session_id",session.id);toast("Stimmen gelöscht");};
+  const printBtn=el("button","btn ghost small","Drucken / PDF");printBtn.onclick=()=>window.print();
+  ctrl.append(closeBtn,resetBtn,printBtn);linkCard.append(ctrl);
+  app.append(linkCard);
+
+  const resultsHost=el("div");app.append(resultsHost);
+  async function refresh(){const {data}=await sb.from("votes").select("ratings").eq("session_id",session.id);votes=data||[];const host=el("div");drawResults(session,votes,true,host);resultsHost.replaceChildren(host);}
+  refresh();
+  // Live: neue Stimmen sofort einrechnen
+  sb.channel("votes-"+session.id).on("postgres_changes",{event:"*",schema:"public",table:"votes",filter:"session_id=eq."+session.id},()=>refresh()).subscribe();
+}
+
+/* ---------- Ergebnis rendern (gemeinsam für Admin & Teilnehmende) ---------- */
+function drawResults(session,votes,isAdmin,host){
+  host=host||app;if(host===app)app.innerHTML="";
+  const {scale,theses}=session;const voted=votes.length;
+  const head=el("div","card");
+  const hr=el("div","row spread");
+  const hl=el("div");hl.append(Object.assign(el("h3",null,isAdmin?"Karte (live)":"Ergebnis"),{style:"font-size:17px"}));
+  const l=el("div","live");if(isAdmin){l.append(el("span","pulse"));}l.append(document.createTextNode(`${voted} Stimme${voted!==1?"n":""}`));hl.append(l);hr.append(hl);
+  head.append(hr);
+  if(!voted){head.append(el("p","hint","Noch keine Stimmen. Sobald abgestimmt wird, erscheint die Karte."));host.append(head);return;}
+  const {svg,stats}=buildMap(scale,theses,votes);
+  const cnt={};Object.keys(CAT).forEach(k=>cnt[k]=0);stats.forEach(s=>{if(s.n)cnt[s.cat]++;});
+  const kpis=el("div","kpis");const kpi=(n,t,col)=>{const d=el("div","kpi");const b=el("b",null,n);if(col)b.style.color=col;d.append(b,el("span",null,t));return d;};
+  kpis.append(kpi(cnt.boden,"gemeinsamer Boden","var(--boden)"),kpi(cnt.umstritten,"umstritten","var(--umstritten)"));
+  if(SCALES[scale].hasVeto)kpis.append(kpi(cnt.einwand,"mit offenem Einwand","var(--einwand)"));
+  head.append(kpis);host.append(head);
+
+  const mapCard=el("div","card");mapCard.append(svg,legend(scale));
+  mapCard.append(Object.assign(el("p","small muted"),{textContent:"Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.",style:"margin-top:10px"}));
+  host.append(mapCard);
+
+  const rd=el("div","card reading");rd.append(Object.assign(el("h3",null,"Lesart"),{style:"font-size:15px;margin-bottom:8px"}));rd.append(readingText(stats,theses));host.append(rd);
+
+  const det=el("div","card");det.append(Object.assign(el("h3",null,"Thesen im Detail"),{style:"font-size:15px;margin-bottom:6px"}));
+  const ul=el("ul","tlist");const order=["einwand","umstritten","unentschieden","ablehnung","boden"];
+  theses.map((t,i)=>({t,i,s:stats[i]})).filter(o=>o.s.n).sort((a,b)=>order.indexOf(a.s.cat)-order.indexOf(b.s.cat)).forEach(o=>ul.append(thesisItem(o.t,o.i,o.s,scale)));
+  det.append(ul);host.append(det);
+}
+
+/* ---------- Los ---------- */
+route();
+</script>
+</body>
+</html>
