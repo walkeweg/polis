@@ -81,19 +81,12 @@
   svg.map{width:100%;height:auto;display:block;border-radius:12px;background:var(--plot);border:1px solid var(--line)}
   .axlabel{fill:var(--muted);font-size:12px;font-family:Inter;font-weight:500}
   .zonelabel{fill:var(--muted);font-size:11px;font-family:Inter;opacity:.5;letter-spacing:.02em}
-  .qlabel{fill:#fff;font-size:12px;font-weight:700;font-family:Inter;text-anchor:middle;pointer-events:none}
-  .ringlabel{fill:var(--muted);font-size:10.5px;font-family:Inter;opacity:.55}
-  .pt{cursor:pointer}
-  .plotwrap{position:relative;margin-top:12px}
-  .tip{position:absolute;left:0;top:0;z-index:5;width:max-content;max-width:260px;pointer-events:none;opacity:0;transform:translate(-50%,-100%);transition:opacity .12s;background:var(--card);color:var(--ink);border:1px solid var(--line);border-radius:10px;box-shadow:var(--shadow);padding:9px 11px;font-size:13px;line-height:1.4}
-  .tip.below{transform:translate(-50%,0)}
-  .tip.show{opacity:1}
-  .tip b{display:block;font-weight:600;margin-bottom:3px}
-  .tip .m{color:var(--muted);font-size:12px}
-  .viewtabs{display:flex;gap:6px}
-  .viewtabs button{font:inherit;font-size:13px;cursor:pointer;border:1px solid var(--line);background:transparent;color:var(--muted);border-radius:999px;padding:6px 13px}
-  .viewtabs button:hover{border-color:var(--muted)}
-  .viewtabs button[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);background:var(--boden-bg);font-weight:600}
+  .qlabel{fill:#fff;font-size:13px;font-weight:700;font-family:Inter;text-anchor:middle;dominant-baseline:central;pointer-events:none}
+  .kk-tip{position:fixed;z-index:60;max-width:280px;background:var(--ink);color:var(--card);padding:7px 11px;border-radius:8px;font-size:13px;line-height:1.35;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 6px 20px rgba(0,0,0,.25)}
+  .kk-tip.show{opacity:1}
+  .viewtoggle{display:inline-flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px}
+  .viewtoggle button{border:none;background:none;font:inherit;font-size:13px;color:var(--muted);padding:6px 14px;border-radius:999px;cursor:pointer}
+  .viewtoggle button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:12.5px}
   .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
   .dot{width:11px;height:11px;border-radius:50%}
@@ -108,6 +101,10 @@
   .stack{display:flex;height:12px;border-radius:6px;overflow:hidden;margin-top:10px;border:1px solid var(--line-soft)}
   .stack i{display:block;height:100%}
   .disttags{font-size:11.5px;color:var(--muted);margin-top:7px;display:flex;gap:12px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+  .vcomment{margin-top:11px;min-height:0;font-size:13.5px}
+  .comments{margin-top:11px;border-top:1px dashed var(--line);padding-top:9px}
+  .comments .clabel{font-size:11.5px;font-weight:600;color:var(--muted);margin-bottom:5px}
+  .comments .citem{font-size:13px;background:var(--paper);border:1px solid var(--line-soft);border-radius:8px;padding:7px 10px;margin-bottom:5px;white-space:pre-wrap}
   .linkbox{display:flex;gap:8px;align-items:center;margin-top:8px}
   .linkbox input{font-size:12.5px}
   .qrbox{display:flex;justify-content:center;padding:16px;background:#fff;border-radius:12px;border:1px solid var(--line);margin-top:12px}
@@ -144,6 +141,14 @@ const $=s=>document.querySelector(s);
 const el=(t,c,txt)=>{const e=document.createElement(t);if(c)e.className=c;if(txt!=null)e.textContent=txt;return e;};
 const app=$("#app");
 function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("show");clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove("show"),1700);}
+function kkTip(){let t=document.getElementById("kk-tip");if(!t){t=document.createElement("div");t.id="kk-tip";t.className="kk-tip";document.body.appendChild(t);}return t;}
+function bindTip(node,txt){
+  node.style.cursor="pointer";
+  node.addEventListener("mouseenter",()=>{const t=kkTip();t.textContent=txt;t.classList.add("show");});
+  node.addEventListener("mousemove",e=>{const t=kkTip();t.style.left=Math.min(e.clientX+14,innerWidth-300)+"px";t.style.top=(e.clientY+16)+"px";});
+  node.addEventListener("mouseleave",()=>{kkTip().classList.remove("show");});
+}
+let currentMapView="quadrant";
 $("#themebtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme");const d=matchMedia("(prefers-color-scheme:dark)").matches;document.documentElement.setAttribute("data-theme",c?(c==="dark"?"light":"dark"):(d?"light":"dark"));};
 
 /* ---------- Skalen & Kategorien ---------- */
@@ -151,13 +156,15 @@ const SCALES={
   consent5:{max:2,hasVeto:true,blockVal:-2,
     opts:[{v:2,g:"++",label:"Volle Zustimmung"},{v:1,g:"+",label:"Zustimmung, kleine Vorbehalte"},{v:0,g:"o",label:"Neutral / enthalte mich"},{v:-1,g:"–",label:"Bedenken"},{v:-2,g:"✕",label:"Einwand (blockiert)"}],
     hint:"Konsent heisst nicht «Mehrheit dafür», sondern «kein schwerwiegender Einwand». Ein einziger Einwand wird eigens markiert."},
+  opinion5:{max:2,hasVeto:false,blockVal:null,
+    opts:[{v:2,g:"++",label:"Volle Zustimmung"},{v:1,g:"+",label:"Eher Zustimmung"},{v:0,g:"o",label:"Neutral"},{v:-1,g:"–",label:"Eher Ablehnung"},{v:-2,g:"−−",label:"Klare Ablehnung"}],
+    hint:"Reines Stimmungsbild: Richtung und Stärke der Einigkeit, ohne dass eine einzelne Stimme blockiert. Gut, wenn ihr noch nichts beschliesst, sondern seht, wo ihr steht."},
   thumb3:{max:1,hasVeto:false,blockVal:null,
     opts:[{v:1,g:"+",label:"Dafür"},{v:0,g:"o",label:"Neutral"},{v:-1,g:"–",label:"Dagegen"}],
     hint:"Schnell und niederschwellig, gut für jüngere Klassen. Richtung und Streuung, aber kein blockierendes Veto."}
 };
 function scaleColor(v,max){if(max===1){return {1:"var(--boden)",0:"var(--muted)","-1":"var(--umstritten)"}[v];}return {2:"var(--boden)",1:"#7bbf8f",0:"var(--muted)","-1":"var(--umstritten)","-2":"var(--einwand)"}[v];}
 const CAT={boden:{label:"Gemeinsamer Boden",color:"var(--boden)",bg:"var(--boden-bg)"},ablehnung:{label:"Getragene Ablehnung",color:"var(--ablehnung)",bg:"var(--ablehnung-bg)"},unentschieden:{label:"Einig, aber unentschieden",color:"var(--unent)",bg:"var(--unent-bg)"},umstritten:{label:"Umstritten",color:"var(--umstritten)",bg:"var(--umstritten-bg)"},einwand:{label:"Einwand offen",color:"var(--einwand)",bg:"var(--einwand-bg)"}};
-let mapView="karte";
 
 /* ---------- Statistik (Streuung statt Mittelwert) ---------- */
 function statsFor(scale,theses,votes,i){
@@ -177,40 +184,6 @@ function statsFor(scale,theses,votes,i){
   return{n,mean,sd,x,unity,veto,dist,cat};
 }
 
-/* ---------- Punkte entzerren ----------
-   Zwei Punkte dürfen sich nie überdecken. Erst werden sie auseinander-
-   geschoben, danach setzt eine Spiralsuche jeden Rest auf den nächsten
-   freien Platz. clamp hält jeden Punkt in seinem erlaubten Bereich. */
-function resolveOverlaps(pts,gap,clamp){
-  const need=(A,B)=>A.r+B.r+gap;
-  for(let it=0;it<200;it++){
-    let moved=false;
-    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
-      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy),nd=need(A,B);
-      if(d>=nd-0.01)continue;
-      if(d<0.01){const ang=a*2.399+b;dx=Math.cos(ang);dy=Math.sin(ang);d=1;}
-      const p=(nd-d)/2,ux=dx/d,uy=dy/d;
-      A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;moved=true;
-    }
-    pts.forEach(clamp);
-    if(!moved)break;
-  }
-  const free=(P,x,y)=>pts.every(Q=>Q===P||Math.hypot(Q.x-x,Q.y-y)>=need(P,Q)-0.01);
-  pts.forEach(P=>{
-    if(free(P,P.x,P.y))return;
-    const sx=P.x,sy=P.y;
-    for(let step=1;step<=120;step++){
-      const rad=step*3,n=Math.max(10,Math.round(rad*0.9));
-      for(let k=0;k<n;k++){
-        const ang=k*2*Math.PI/n+step*0.7;
-        const t={r:P.r,r0:P.r0,x:sx+Math.cos(ang)*rad,y:sy+Math.sin(ang)*rad};
-        clamp(t);
-        if(free(P,t.x,t.y)){P.x=t.x;P.y=t.y;return;}
-      }
-    }
-  });
-}
-
 /* ---------- Karte ---------- */
 function buildMap(scale,theses,votes){
   const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
@@ -218,14 +191,16 @@ function buildMap(scale,theses,votes){
   const W=640,H=400, mL=64,mR=24,mT=28,mB=56;
   const x0=mL,y0=mT,x1=W-mR,y1=H-mB, pw=x1-x0, ph=y1-y0;
   const padX=pw*0.11, padY=ph*0.11;
-  const px=x=>x0+padX+((x+1)/2)*(pw-2*padX);
-  const py=u=>y0+padY+(1-u)*(ph-2*padY);
+  const px=x=>x0+padX+((x+1)/2)*(pw-2*padX);   // x:-1..1 -> links..rechts
+  const py=u=>y0+padY+(1-u)*(ph-2*padY);       // u:0..1  -> unten..oben
   const midX=px(0), thrY=py(0.5);
+
   const svg=document.createElementNS(ns,"svg");
   svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
   svg.setAttribute("role","img");svg.setAttribute("aria-label","Konsenskarte: Thesen nach Zustimmung und Einigkeit");
   const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
-  const text=(x,y,s,o,parent)=>{const t=add("text",Object.assign({x,y},o||{}),parent);t.textContent=s;return t;};
+  const text=(x,y,s,o)=>{const t=add("text",Object.assign({x,y},o||{}));t.textContent=s;return t;};
+
   // Zonenflächen, beschnitten auf die abgerundeten Ecken (sonst laufen sie über)
   const defs=add("defs",{});
   add("rect",{x:x0,y:y0,width:pw,height:ph,rx:12},add("clipPath",{id:"kkclip"},defs));
@@ -237,6 +212,7 @@ function buildMap(scale,theses,votes){
   add("line",{x1:x0,y1:thrY,x2:x1,y2:thrY,stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"},zonesG);
   // Rahmen darüber
   add("rect",{x:x0,y:y0,width:pw,height:ph,fill:"none",stroke:"var(--line)","stroke-width":1,rx:12});
+  // Zonen-Beschriftung, dezent im Hintergrund
   text((midX+x1)/2,y0+22,"gemeinsamer Boden",{class:"zonelabel","text-anchor":"middle"});
   text((x0+midX)/2,y0+22,"getragene Ablehnung",{class:"zonelabel","text-anchor":"middle"});
   text((x0+x1)/2,y1-14,"umstritten",{class:"zonelabel","text-anchor":"middle"});
@@ -246,101 +222,72 @@ function buildMap(scale,theses,votes){
   text(x0-18,yLo,"uneinig",{class:"axlabel","text-anchor":"middle",transform:`rotate(-90 ${x0-18} ${yLo})`});
   text(x0,y1+32,"← Ablehnung",{class:"axlabel","text-anchor":"start"});
   text(x1,y1+32,"Zustimmung →",{class:"axlabel","text-anchor":"end"});
-  const R=11;
-  const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,dr:R,r:R+(s.veto>0?4:0),x:px(s.x),y:py(s.unity)});});
-  resolveOverlaps(pts,4,P=>{
-    P.x=Math.max(x0+P.r+2,Math.min(x1-P.r-2,P.x));
-    P.y=Math.max(y0+P.r+2,Math.min(y1-P.r-2,P.y));
-  });
+
+  // Punkte platzieren, dann leichte Kollisionsauflösung gegen Überlappung
+  const R=10, minD=R*2+4;
+  const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,x:px(s.x),y:py(s.unity)});});
+  for(let it=0;it<80;it++){
+    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
+      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01;
+      if(d<minD){const p=(minD-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
+    }
+    pts.forEach(P=>{P.x=Math.max(x0+R,Math.min(x1-R,P.x));P.y=Math.max(y0+R,Math.min(y1-R,P.y));});
+  }
   pts.forEach(P=>{
-    const g=add("g",{class:"pt",tabindex:"0",role:"img","aria-label":`These ${P.i+1}: ${theses[P.i]}`});
-    g.dataset.i=P.i;
-    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.dr+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
-    add("circle",{cx:P.x,cy:P.y,r:P.dr,fill:CAT[P.s.cat].color,stroke:"var(--card)","stroke-width":2.5},g);
-    text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em"},g);
+    const g=add("g",{});
+    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:R+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
+    add("circle",{cx:P.x,cy:P.y,r:R,fill:CAT[P.s.cat].color,stroke:"var(--card)","stroke-width":2.5},g);
+    text(P.x,P.y,String(P.i+1),{class:"qlabel"},g);
+    const label=`${P.i+1}. ${theses[P.i]}`;
+    add("title",{},g).textContent=label;
+    bindTip(g,label);
+  });
+  return{svg,stats};
+}
+
+/* ---------- Zielscheibe: Mitte = einig, Grösse = einig, Farbe = Richtung ---------- */
+function buildTarget(scale,theses,votes){
+  const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
+  const ns="http://www.w3.org/2000/svg";
+  const W=640,H=400,mT=24,mB=40,mX=24;
+  const cx=W/2, cy=mT+(H-mT-mB)/2;
+  const Rmax=Math.min(W/2-mX,(H-mT-mB)/2)-4;
+  const svg=document.createElementNS(ns,"svg");
+  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
+  svg.setAttribute("role","img");svg.setAttribute("aria-label","Konsenskarte als Zielscheibe: Mitte bedeutet Einigkeit");
+  const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
+  const text=(x,y,s,o)=>{const t=add("text",Object.assign({x,y},o||{}));t.textContent=s;return t;};
+  for(let k=1;k<=4;k++)add("circle",{cx,cy,r:Rmax*k/4,fill:k===4?"var(--boden-bg)":"none",stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
+  add("circle",{cx,cy,r:2,fill:"var(--muted)"});
+  text(cx,cy-Rmax-8,"Mitte = einig · aussen = uneinig",{class:"axlabel","text-anchor":"middle"});
+  const pts=stats.map((s,i)=>({i,s})).filter(o=>o.s.n);
+  const n=pts.length||1;
+  pts.forEach((P,k)=>{
+    P.rad=(1-P.s.unity)*Rmax;
+    const ang=(k/n)*2*Math.PI-Math.PI/2;
+    P.x=cx+P.rad*Math.cos(ang); P.y=cy+P.rad*Math.sin(ang);
+    P.rDot=7+P.s.unity*8;
+  });
+  for(let it=0;it<140;it++){
+    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
+      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01,md=A.rDot+B.rDot+4;
+      if(d<md){const p=(md-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
+    }
+    pts.forEach(P=>{const dx=P.x-cx,dy=P.y-cy,dd=Math.hypot(dx,dy)||0.01,ux=dx/dd,uy=dy/dd;const r=dd*0.7+P.rad*0.3;const lim=Rmax-P.rDot;const rr=Math.min(r,lim);P.x=cx+ux*rr;P.y=cy+uy*rr;});
+  }
+  pts.forEach(P=>{
+    const col=P.s.x>0.12?"var(--boden)":(P.s.x<-0.12?"var(--einwand)":"var(--unent)");
+    const g=add("g",{});
+    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.rDot+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
+    add("circle",{cx:P.x,cy:P.y,r:P.rDot,fill:col,stroke:"var(--card)","stroke-width":2.5},g);
+    text(P.x,P.y,String(P.i+1),{class:"qlabel"},g);
+    const label=`${P.i+1}. ${theses[P.i]}`;
+    add("title",{},g).textContent=label;
+    bindTip(g,label);
   });
   return{svg,stats};
 }
 function legend(scale){const lg=el("div","legend");const items=[["boden","Gemeinsamer Boden"],["ablehnung","Getragene Ablehnung"],["unentschieden","Einig, unentschieden"],["umstritten","Umstritten"]];if(SCALES[scale].hasVeto)items.push(["einwand","Einwand offen"]);items.forEach(([k,l])=>{const s=el("span");const d=el("span","dot");d.style.background=CAT[k].color;s.append(d,document.createTextNode(l));lg.append(s);});return lg;}
-
-/* ---------- Zielscheibe ---------- */
-function buildTarget(scale,theses,votes){
-  const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
-  const ns="http://www.w3.org/2000/svg";
-  const W=640,H=408, cx=W/2, cy=H/2-16, maxR=160, inner=maxR-18;
-  const svg=document.createElementNS(ns,"svg");
-  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
-  svg.setAttribute("role","img");svg.setAttribute("aria-label","Zielscheibe: Mitte heisst einig, Rand heisst uneinig");
-  const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
-  const text=(x,y,s,o,parent)=>{const t=add("text",Object.assign({x,y},o||{}),parent);t.textContent=s;return t;};
-  // Ringe: aussen uneinig, Mitte einig
-  add("circle",{cx,cy,r:maxR,fill:"var(--card)",stroke:"var(--line)","stroke-width":1});
-  add("circle",{cx,cy,r:maxR*.68,fill:"none",stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
-  add("circle",{cx,cy,r:maxR*.36,fill:"var(--boden-bg)",stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
-  add("circle",{cx,cy,r:2,fill:"var(--line)"});
-  text(cx,cy+maxR+26,"Mitte = einig · Rand = uneinig",{class:"zonelabel","text-anchor":"middle"});
-  // Punkte: Radius = Uneinigkeit, Grösse = Einigkeit, Farbe = Richtung
-  const pts=[];const voted=stats.filter(s=>s.n).length;let k=0;
-  stats.forEach((s,i)=>{
-    if(!s.n)return;
-    const pr=9+s.unity*7, r0=Math.min(inner-pr,(1-s.unity)*inner);
-    const a=-Math.PI/2+(k++)*2*Math.PI/Math.max(1,voted);
-    pts.push({i,s,dr:pr,r:pr+(s.veto>0?4:0),r0,x:cx+Math.cos(a)*r0,y:cy+Math.sin(a)*r0});
-  });
-  // nie näher zur Mitte als der eigene Ring, nur bei Gedränge weiter nach aussen
-  resolveOverlaps(pts,4,P=>{
-    const dx=P.x-cx,dy=P.y-cy,d=Math.hypot(dx,dy);
-    if(d<0.001){if(P.r0>0.001){P.x=cx;P.y=cy-P.r0;}return;}
-    const nr=Math.min(inner-P.r,Math.max(P.r0,d));P.x=cx+dx/d*nr;P.y=cy+dy/d*nr;
-  });
-  pts.forEach(P=>{
-    const x=P.s.x, w=Math.round(Math.min(1,Math.abs(x))*100);
-    const base=x>=0?"var(--boden)":"var(--einwand)";
-    const fb=x>=.2?"var(--boden)":x<=-.2?"var(--einwand)":"var(--muted)";
-    const g=add("g",{class:"pt",tabindex:"0",role:"img","aria-label":`These ${P.i+1}: ${theses[P.i]}`});
-    g.dataset.i=P.i;
-    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.dr+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
-    const c=add("circle",{cx:P.x,cy:P.y,r:P.dr,fill:fb,stroke:"var(--card)","stroke-width":2.5},g);
-    c.style.fill=`color-mix(in srgb, ${base} ${w}%, var(--muted))`;
-    text(P.x,P.y,String(P.i+1),{class:"qlabel","text-anchor":"middle",dy:"0.35em",style:`font-size:${Math.max(10,Math.round(P.dr*.95))}px`},g);
-  });
-  return{svg,stats};
-}
-function targetLegend(scale){
-  const lg=el("div","legend");
-  const item=(css,label)=>{const s=el("span");const d=el("span","dot");d.style.cssText=css;s.append(d,document.createTextNode(label));return s;};
-  lg.append(item("background:var(--einwand)","Ablehnung"),item("background:var(--muted)","neutral"),item("background:var(--boden)","Zustimmung"));
-  if(SCALES[scale].hasVeto)lg.append(item("background:transparent;border:2px solid var(--einwand)","Einwand offen"));
-  lg.append(el("span",null,"Nähe zur Mitte und Punktgrösse = Einigkeit"));
-  return lg;
-}
-/* ---------- Hinweisfeld beim Darüberfahren ---------- */
-function attachTips(svg,wrap,theses,stats){
-  const tip=el("div","tip");wrap.append(tip);
-  let cur=null;
-  const hide=()=>{tip.classList.remove("show");cur=null;};
-  svg.querySelectorAll("g.pt").forEach(g=>{
-    const i=+g.dataset.i, s=stats[i];
-    const show=()=>{
-      tip.textContent="";
-      tip.append(el("b",null,`${i+1}. ${theses[i]}`),
-                 el("span","m",`${CAT[s.cat].label} · ${s.n} Stimme${s.n!==1?"n":""} · Einigkeit ${Math.round(s.unity*100)}\u00a0%`));
-      tip.classList.add("show");
-      const r=g.getBoundingClientRect(),w=wrap.getBoundingClientRect(),tw=tip.offsetWidth;
-      const above=r.top-w.top>tip.offsetHeight+10;
-      tip.classList.toggle("below",!above);
-      tip.style.left=Math.max(tw/2+2,Math.min(w.width-tw/2-2,r.left-w.left+r.width/2))+"px";
-      tip.style.top=(above?r.top-w.top-8:r.bottom-w.top+8)+"px";
-      cur=g;
-    };
-    g.addEventListener("mouseenter",show);
-    g.addEventListener("mouseleave",hide);
-    g.addEventListener("focus",show);
-    g.addEventListener("blur",hide);
-    g.addEventListener("click",e=>{e.stopPropagation();cur===g?hide():show();});
-  });
-  svg.addEventListener("click",hide);
-}
 function readingText(stats,theses){
   const f=document.createDocumentFragment();const by=k=>stats.map((s,i)=>({s,i})).filter(o=>o.s.n&&o.s.cat===k).map(o=>o.i+1);const L=a=>a.length?("These "+a.join(", ")):null;const p=t=>{const e=el("p");e.textContent=t;return e;};
   const boden=by("boden"),umstr=by("umstritten"),ein=by("einwand"),unent=by("unentschieden"),abl=by("ablehnung");
@@ -422,8 +369,8 @@ function renderCreate(){
   c.append(Object.assign(el("h2",null,"Neue Runde"),{style:"font-size:19px;margin-bottom:14px"}));
   const name=el("input");name.type="text";name.placeholder="z. B. Regeln fürs Klassenzimmer";
   const th=el("textarea");th.placeholder="Eine These pro Zeile.\nWir beginnen jede Sitzung pünktlich.\nHandys bleiben im Unterricht in der Tasche.";
-  const sel=el("select");sel.innerHTML='<option value="consent5">Konsent (5 Stufen, mit Einwand)</option><option value="thumb3">Einfach (3 Stufen)</option>';
-  const hint=el("p","hint");hint.textContent=SCALES.consent5.hint;sel.onchange=()=>hint.textContent=SCALES[sel.value].hint;
+  const sel=el("select");sel.innerHTML='<option value="opinion5">Meinungsbild (5 Stufen, ohne Veto)</option><option value="consent5">Konsent (5 Stufen, mit Einwand)</option><option value="thumb3">Einfach (3 Stufen)</option>';
+  const hint=el("p","hint");hint.textContent=SCALES.opinion5.hint;sel.onchange=()=>hint.textContent=SCALES[sel.value].hint;
   const f1=el("label","field");f1.append(el("span",null,"Titel der Runde"),name);
   const f2=el("label","field");f2.append(el("span",null,"Thesen, denen man zustimmen oder widersprechen kann"),th);
   const f3=el("label","field");f3.append(el("span",null,"Skala"),sel);
@@ -447,7 +394,7 @@ function renderVote(session){
   const votedKey="kk_voted_"+session.code;
   if(localStorage.getItem(votedKey)){return renderThanks(session,true);}
   if(!session.is_open){app.append(el("div","card","Diese Runde ist geschlossen. Es kann nicht mehr abgestimmt werden."));return;}
-  const sc=SCALES[session.scale];const draft=new Array(session.theses.length).fill(null);
+  const sc=SCALES[session.scale];const draft=new Array(session.theses.length).fill(null);const comments=new Array(session.theses.length).fill("");
   const head=el("div","card");head.style.marginBottom="14px";
   head.append(Object.assign(el("h2",null,session.title||"Abstimmung"),{style:"font-size:18px"}));
   head.append(el("div","small muted","Deine Stimme ist anonym. Du stimmst einmal ab."));
@@ -457,14 +404,16 @@ function renderVote(session){
     const qt=el("div","qtext");qt.append(Object.assign(el("span","qnum"),{textContent:(i+1)+"."}),document.createTextNode(" "+t));q.append(qt);
     const opts=el("div","opts");
     sc.opts.forEach(o=>{const b=el("button","opt");b.type="button";if(o.v<0)b.dataset.neg="1";if(sc.hasVeto&&o.v===sc.blockVal)b.dataset.block="1";b.setAttribute("aria-pressed","false");b.title=o.label;b.append(Object.assign(el("span","g"),{textContent:o.g}));b.append(document.createTextNode(o.label));b.onclick=()=>{draft[i]=o.v;opts.querySelectorAll(".opt").forEach(x=>x.setAttribute("aria-pressed","false"));b.setAttribute("aria-pressed","true");upd();};opts.append(b);});
-    q.append(opts);app.append(q);
+    q.append(opts);
+    const ca=el("textarea","vcomment");ca.rows=2;ca.placeholder="Was spricht dagegen, oder was bräuchte es, damit du mittragen kannst? (freiwillig)";ca.oninput=()=>{comments[i]=ca.value;};q.append(ca);
+    app.append(q);
   });
   const bar=el("div","bar noprint");const inner=el("div","inner");const prog=el("div","progress");const send=el("button","btn","Abstimmen");
   inner.append(prog,send);bar.append(inner);document.body.append(bar);
   function upd(){const done=draft.filter(x=>x!=null).length;prog.textContent=`${done} von ${draft.length} beantwortet`;send.disabled=done<draft.length;}
   upd();
   send.onclick=async()=>{send.disabled=true;send.textContent="Sende …";
-    const {error}=await sb.from("votes").insert({session_id:session.id,ratings:draft});
+    const {error}=await sb.from("votes").insert({session_id:session.id,ratings:draft,comments:comments.map(c=>c.trim()?c.trim():null)});
     if(error){toast("Senden fehlgeschlagen");send.disabled=false;send.textContent="Abstimmen";return;}
     try{localStorage.setItem(votedKey,"1");}catch(e){}
     bar.remove();renderThanks(session,false);
@@ -533,32 +482,39 @@ function drawResults(session,votes,isAdmin,host){
   head.append(kpis);host.append(head);
 
   const mapCard=el("div","card");
-  const mhead=el("div","row spread");
-  mhead.append(Object.assign(el("h3",null,"Übersicht"),{style:"font-size:15px"}));
-  const tabs=el("div","viewtabs"),btns={};
-  const wrap=el("div","plotwrap"),lgHost=el("div");
-  const cap=Object.assign(el("p","small muted"),{style:"margin-top:10px"});
-  const CAPS={karte:"Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.",
-              ziel:"Zielscheibe: Je näher an der Mitte und je grösser der Punkt, desto einiger ist die Gruppe. Die Farbe zeigt die Richtung: rot heisst Ablehnung, teal heisst Zustimmung."};
-  const renderMap=()=>{
-    wrap.textContent="";lgHost.textContent="";
-    const built=mapView==="ziel"?buildTarget(scale,theses,votes):buildMap(scale,theses,votes);
-    wrap.append(built.svg);attachTips(built.svg,wrap,theses,stats);
-    lgHost.append(mapView==="ziel"?targetLegend(scale):legend(scale));
-    cap.textContent=CAPS[mapView];
-    for(const k in btns)btns[k].setAttribute("aria-pressed",String(k===mapView));
-  };
-  [["karte","Karte"],["ziel","Zielscheibe"]].forEach(([k,l])=>{
-    const b=el("button",null,l);b.type="button";btns[k]=b;b.onclick=()=>{mapView=k;renderMap();};tabs.append(b);
-  });
-  mhead.append(tabs);mapCard.append(mhead,wrap,lgHost,cap);renderMap();
+  const bar=el("div","row spread");bar.style.marginBottom="12px";
+  const tg=el("div","viewtoggle");const bQ=el("button",null,"Quadrant");const bZ=el("button",null,"Zielscheibe");bQ.type="button";bZ.type="button";tg.append(bQ,bZ);
+  bar.append(el("div","small muted","Ansicht"),tg);mapCard.append(bar);
+  const plot=el("div");const cap=el("p","small muted");cap.style.marginTop="10px";
+  mapCard.append(plot,cap);
+  function renderPlot(){
+    bQ.setAttribute("aria-pressed",String(currentMapView==="quadrant"));
+    bZ.setAttribute("aria-pressed",String(currentMapView==="target"));
+    if(currentMapView==="target"){
+      plot.replaceChildren(buildTarget(scale,theses,votes).svg);
+      cap.textContent="Zielscheibe: je näher an der Mitte, desto einiger die Gruppe, und desto grösser der Punkt. Teal bedeutet Zustimmung, Rot Ablehnung. Der Winkel hat keine Bedeutung, er dient nur der Verteilung.";
+    }else{
+      plot.replaceChildren(buildMap(scale,theses,votes).svg,legend(scale));
+      cap.textContent="Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.";
+    }
+  }
+  bQ.onclick=()=>{currentMapView="quadrant";renderPlot();};
+  bZ.onclick=()=>{currentMapView="target";renderPlot();};
+  renderPlot();
   host.append(mapCard);
 
   const rd=el("div","card reading");rd.append(Object.assign(el("h3",null,"Lesart"),{style:"font-size:15px;margin-bottom:8px"}));rd.append(readingText(stats,theses));host.append(rd);
 
   const det=el("div","card");det.append(Object.assign(el("h3",null,"Thesen im Detail"),{style:"font-size:15px;margin-bottom:6px"}));
   const ul=el("ul","tlist");const order=["einwand","umstritten","unentschieden","ablehnung","boden"];
-  theses.map((t,i)=>({t,i,s:stats[i]})).filter(o=>o.s.n).sort((a,b)=>order.indexOf(a.s.cat)-order.indexOf(b.s.cat)).forEach(o=>ul.append(thesisItem(o.t,o.i,o.s,scale)));
+  theses.map((t,i)=>({t,i,s:stats[i]})).filter(o=>o.s.n).sort((a,b)=>order.indexOf(a.s.cat)-order.indexOf(b.s.cat)).forEach(o=>{
+    const li=thesisItem(o.t,o.i,o.s,scale);
+    if(isAdmin){
+      const cs=votes.map(v=>v.comments&&v.comments[o.i]).filter(Boolean);
+      if(cs.length){const box=el("div","comments");box.append(el("div","clabel","Kommentare ("+cs.length+")"));cs.forEach(c=>box.append(el("div","citem",c)));li.append(box);}
+    }
+    ul.append(li);
+  });
   det.append(ul);host.append(det);
 }
 
