@@ -219,15 +219,20 @@ function buildMap(scale,theses,votes){
   text(x0,y1+32,"← Ablehnung",{class:"axlabel","text-anchor":"start"});
   text(x1,y1+32,"Zustimmung →",{class:"axlabel","text-anchor":"end"});
 
-  // Punkte platzieren, dann leichte Kollisionsauflösung gegen Überlappung
-  const R=10, minD=R*2+4;
+  // Punkte platzieren, dann Kollisionsauflösung: Punkte dürfen sich nie überlappen
+  const R=10, minD=R*2+5;
   const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,x:px(s.x),y:py(s.unity)});});
-  for(let it=0;it<80;it++){
+  // Mikro-Streuung nach goldenem Winkel, damit exakt gleich bewertete Punkte eine Startrichtung haben
+  pts.forEach((P,k)=>{P.x+=Math.cos(k*2.399963)*0.8;P.y+=Math.sin(k*2.399963)*0.8;});
+  for(let it=0;it<400;it++){
+    let moved=false;
     for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
-      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01;
-      if(d<minD){const p=(minD-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
+      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy);
+      if(d<0.001){const ang=(a*12.9898+b*78.233);dx=Math.cos(ang);dy=Math.sin(ang);d=1;}
+      if(d<minD){const p=(minD-d)/2+0.01,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;moved=true;}
     }
     pts.forEach(P=>{P.x=Math.max(x0+R,Math.min(x1-R,P.x));P.y=Math.max(y0+R,Math.min(y1-R,P.y));});
+    if(!moved)break;
   }
   pts.forEach(P=>{
     const g=add("g",{});
@@ -304,6 +309,7 @@ create table votes (
   id uuid primary key default gen_random_uuid(),
   session_id uuid references sessions(id) on delete cascade,
   ratings jsonb not null,
+  comments jsonb,
   created_at timestamptz default now()
 );
 alter table sessions enable row level security;
@@ -387,7 +393,7 @@ function renderThanks(session,already){
 /* ---------- Ergebnis-Ansicht (für Teilnehmende nach dem Voten) ---------- */
 async function renderResultsView(session,isAdmin){
   app.innerHTML="";
-  const {data:votes}=await sb.from("votes").select("ratings").eq("session_id",session.id);
+  const {data:votes}=await sb.from("votes").select("ratings,comments").eq("session_id",session.id);
   drawResults(session,votes||[],isAdmin);
 }
 
@@ -413,7 +419,7 @@ function renderAdmin(session){
   app.append(linkCard);
 
   const resultsHost=el("div");app.append(resultsHost);
-  async function refresh(){const {data}=await sb.from("votes").select("ratings").eq("session_id",session.id);votes=data||[];const host=el("div");drawResults(session,votes,true,host);resultsHost.replaceChildren(host);}
+  async function refresh(){const {data}=await sb.from("votes").select("ratings,comments").eq("session_id",session.id);votes=data||[];const host=el("div");drawResults(session,votes,true,host);resultsHost.replaceChildren(host);}
   refresh();
   // Live: neue Stimmen sofort einrechnen
   sb.channel("votes-"+session.id).on("postgres_changes",{event:"*",schema:"public",table:"votes",filter:"session_id=eq."+session.id},()=>refresh()).subscribe();
