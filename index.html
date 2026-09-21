@@ -84,9 +84,6 @@
   .qlabel{fill:#fff;font-size:13px;font-weight:700;font-family:Inter;text-anchor:middle;dominant-baseline:central;pointer-events:none}
   .kk-tip{position:fixed;z-index:60;max-width:280px;background:var(--ink);color:var(--card);padding:7px 11px;border-radius:8px;font-size:13px;line-height:1.35;pointer-events:none;opacity:0;transition:opacity .12s;box-shadow:0 6px 20px rgba(0,0,0,.25)}
   .kk-tip.show{opacity:1}
-  .viewtoggle{display:inline-flex;gap:4px;background:var(--paper);border:1px solid var(--line);border-radius:999px;padding:3px}
-  .viewtoggle button{border:none;background:none;font:inherit;font-size:13px;color:var(--muted);padding:6px 14px;border-radius:999px;cursor:pointer}
-  .viewtoggle button[aria-pressed="true"]{background:var(--card);color:var(--ink);box-shadow:var(--shadow);font-weight:600}
   .legend{display:flex;flex-wrap:wrap;gap:8px 16px;margin-top:12px;font-size:12.5px}
   .legend span{display:inline-flex;align-items:center;gap:6px;color:var(--muted)}
   .dot{width:11px;height:11px;border-radius:50%}
@@ -148,7 +145,6 @@ function bindTip(node,txt){
   node.addEventListener("mousemove",e=>{const t=kkTip();t.style.left=Math.min(e.clientX+14,innerWidth-300)+"px";t.style.top=(e.clientY+16)+"px";});
   node.addEventListener("mouseleave",()=>{kkTip().classList.remove("show");});
 }
-let currentMapView="quadrant";
 $("#themebtn").onclick=()=>{const c=document.documentElement.getAttribute("data-theme");const d=matchMedia("(prefers-color-scheme:dark)").matches;document.documentElement.setAttribute("data-theme",c?(c==="dark"?"light":"dark"):(d?"light":"dark"));};
 
 /* ---------- Skalen & Kategorien ---------- */
@@ -245,48 +241,7 @@ function buildMap(scale,theses,votes){
   return{svg,stats};
 }
 
-/* ---------- Zielscheibe: Mitte = einig, Grösse = einig, Farbe = Richtung ---------- */
-function buildTarget(scale,theses,votes){
-  const stats=theses.map((_,i)=>statsFor(scale,theses,votes,i));
-  const ns="http://www.w3.org/2000/svg";
-  const W=640,H=400,mT=24,mB=40,mX=24;
-  const cx=W/2, cy=mT+(H-mT-mB)/2;
-  const Rmax=Math.min(W/2-mX,(H-mT-mB)/2)-4;
-  const svg=document.createElementNS(ns,"svg");
-  svg.setAttribute("viewBox",`0 0 ${W} ${H}`);svg.setAttribute("class","map");
-  svg.setAttribute("role","img");svg.setAttribute("aria-label","Konsenskarte als Zielscheibe: Mitte bedeutet Einigkeit");
-  const add=(name,a,parent)=>{const e=document.createElementNS(ns,name);for(const k in a)e.setAttribute(k,a[k]);(parent||svg).append(e);return e;};
-  const text=(x,y,s,o)=>{const t=add("text",Object.assign({x,y},o||{}));t.textContent=s;return t;};
-  for(let k=1;k<=4;k++)add("circle",{cx,cy,r:Rmax*k/4,fill:k===4?"var(--boden-bg)":"none",stroke:"var(--line)","stroke-width":1,"stroke-dasharray":"2 4"});
-  add("circle",{cx,cy,r:2,fill:"var(--muted)"});
-  text(cx,cy-Rmax-8,"Mitte = einig · aussen = uneinig",{class:"axlabel","text-anchor":"middle"});
-  const pts=stats.map((s,i)=>({i,s})).filter(o=>o.s.n);
-  const n=pts.length||1;
-  pts.forEach((P,k)=>{
-    P.rad=(1-P.s.unity)*Rmax;
-    const ang=(k/n)*2*Math.PI-Math.PI/2;
-    P.x=cx+P.rad*Math.cos(ang); P.y=cy+P.rad*Math.sin(ang);
-    P.rDot=7+P.s.unity*8;
-  });
-  for(let it=0;it<140;it++){
-    for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
-      const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy)||0.01,md=A.rDot+B.rDot+4;
-      if(d<md){const p=(md-d)/2,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;}
-    }
-    pts.forEach(P=>{const dx=P.x-cx,dy=P.y-cy,dd=Math.hypot(dx,dy)||0.01,ux=dx/dd,uy=dy/dd;const r=dd*0.7+P.rad*0.3;const lim=Rmax-P.rDot;const rr=Math.min(r,lim);P.x=cx+ux*rr;P.y=cy+uy*rr;});
-  }
-  pts.forEach(P=>{
-    const col=P.s.x>0.12?"var(--boden)":(P.s.x<-0.12?"var(--einwand)":"var(--unent)");
-    const g=add("g",{});
-    if(P.s.veto>0)add("circle",{cx:P.x,cy:P.y,r:P.rDot+4,fill:"none",stroke:"var(--einwand)","stroke-width":2.4},g);
-    add("circle",{cx:P.x,cy:P.y,r:P.rDot,fill:col,stroke:"var(--card)","stroke-width":2.5},g);
-    text(P.x,P.y,String(P.i+1),{class:"qlabel"},g);
-    const label=`${P.i+1}. ${theses[P.i]}`;
-    add("title",{},g).textContent=label;
-    bindTip(g,label);
-  });
-  return{svg,stats};
-}
+/* ---------- Legende ---------- */
 function legend(scale){const lg=el("div","legend");const items=[["boden","Gemeinsamer Boden"],["ablehnung","Getragene Ablehnung"],["unentschieden","Einig, unentschieden"],["umstritten","Umstritten"]];if(SCALES[scale].hasVeto)items.push(["einwand","Einwand offen"]);items.forEach(([k,l])=>{const s=el("span");const d=el("span","dot");d.style.background=CAT[k].color;s.append(d,document.createTextNode(l));lg.append(s);});return lg;}
 function readingText(stats,theses){
   const f=document.createDocumentFragment();const by=k=>stats.map((s,i)=>({s,i})).filter(o=>o.s.n&&o.s.cat===k).map(o=>o.i+1);const L=a=>a.length?("These "+a.join(", ")):null;const p=t=>{const e=el("p");e.textContent=t;return e;};
@@ -482,25 +437,8 @@ function drawResults(session,votes,isAdmin,host){
   head.append(kpis);host.append(head);
 
   const mapCard=el("div","card");
-  const bar=el("div","row spread");bar.style.marginBottom="12px";
-  const tg=el("div","viewtoggle");const bQ=el("button",null,"Quadrant");const bZ=el("button",null,"Zielscheibe");bQ.type="button";bZ.type="button";tg.append(bQ,bZ);
-  bar.append(el("div","small muted","Ansicht"),tg);mapCard.append(bar);
-  const plot=el("div");const cap=el("p","small muted");cap.style.marginTop="10px";
-  mapCard.append(plot,cap);
-  function renderPlot(){
-    bQ.setAttribute("aria-pressed",String(currentMapView==="quadrant"));
-    bZ.setAttribute("aria-pressed",String(currentMapView==="target"));
-    if(currentMapView==="target"){
-      plot.replaceChildren(buildTarget(scale,theses,votes).svg);
-      cap.textContent="Zielscheibe: je näher an der Mitte, desto einiger die Gruppe, und desto grösser der Punkt. Teal bedeutet Zustimmung, Rot Ablehnung. Der Winkel hat keine Bedeutung, er dient nur der Verteilung.";
-    }else{
-      plot.replaceChildren(buildMap(scale,theses,votes).svg,legend(scale));
-      cap.textContent="Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.";
-    }
-  }
-  bQ.onclick=()=>{currentMapView="quadrant";renderPlot();};
-  bZ.onclick=()=>{currentMapView="target";renderPlot();};
-  renderPlot();
+  mapCard.append(buildMap(scale,theses,votes).svg,legend(scale));
+  mapCard.append(Object.assign(el("p","small muted"),{textContent:"Waagrecht: Ablehnung ↔ Zustimmung. Senkrecht: wie einig die Gruppe ist. Oben rechts trägt die Gruppe. Unten heisst uneinig, unabhängig vom Durchschnitt.",style:"margin-top:10px"}));
   host.append(mapCard);
 
   const rd=el("div","card reading");rd.append(Object.assign(el("h3",null,"Lesart"),{style:"font-size:15px;margin-bottom:8px"}));rd.append(readingText(stats,theses));host.append(rd);
