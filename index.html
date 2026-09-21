@@ -186,9 +186,9 @@ function buildMap(scale,theses,votes){
   const ns="http://www.w3.org/2000/svg";
   const W=640,H=400, mL=64,mR=24,mT=28,mB=56;
   const x0=mL,y0=mT,x1=W-mR,y1=H-mB, pw=x1-x0, ph=y1-y0;
-  const padX=pw*0.11, padY=ph*0.11;
-  const px=x=>x0+padX+((x+1)/2)*(pw-2*padX);   // x:-1..1 -> links..rechts
-  const py=u=>y0+padY+(1-u)*(ph-2*padY);       // u:0..1  -> unten..oben
+  const padX=pw*0.11, band=34;
+  const px=x=>x0+padX+((x+1)/2)*(pw-2*padX);
+  const py=u=>y0+band+(1-u)*(ph-2*band);
   const midX=px(0), thrY=py(0.5);
 
   const svg=document.createElementNS(ns,"svg");
@@ -209,9 +209,9 @@ function buildMap(scale,theses,votes){
   // Rahmen darüber
   add("rect",{x:x0,y:y0,width:pw,height:ph,fill:"none",stroke:"var(--line)","stroke-width":1,rx:12});
   // Zonen-Beschriftung, dezent im Hintergrund
-  text((midX+x1)/2,y0+22,"gemeinsamer Boden",{class:"zonelabel","text-anchor":"middle"});
-  text((x0+midX)/2,y0+22,"getragene Ablehnung",{class:"zonelabel","text-anchor":"middle"});
-  text((x0+x1)/2,y1-14,"umstritten",{class:"zonelabel","text-anchor":"middle"});
+  text((midX+x1)/2,y0+15,"gemeinsamer Boden",{class:"zonelabel","text-anchor":"middle"});
+  text((x0+midX)/2,y0+15,"getragene Ablehnung",{class:"zonelabel","text-anchor":"middle"});
+  text((x0+x1)/2,y1-11,"umstritten",{class:"zonelabel","text-anchor":"middle"});
   // Achsen ausserhalb des Rahmens
   const yUp=(y0+thrY)/2, yLo=(thrY+y1)/2;
   text(x0-18,yUp,"einig",{class:"axlabel","text-anchor":"middle",transform:`rotate(-90 ${x0-18} ${yUp})`});
@@ -221,17 +221,21 @@ function buildMap(scale,theses,votes){
 
   // Punkte platzieren, dann Kollisionsauflösung: Punkte dürfen sich nie überlappen
   const R=10, minD=R*2+5;
-  const pts=[];stats.forEach((s,i)=>{if(s.n)pts.push({i,s,x:px(s.x),y:py(s.unity)});});
-  // Mikro-Streuung nach goldenem Winkel, damit exakt gleich bewertete Punkte eine Startrichtung haben
-  pts.forEach((P,k)=>{P.x+=Math.cos(k*2.399963)*0.8;P.y+=Math.sin(k*2.399963)*0.8;});
+  const dotTop=py(1), dotBot=py(0);
+  const raw=[];stats.forEach((s,i)=>{if(s.n)raw.push({i,s,tx:px(s.x),ty:py(s.unity)});});
+  const groups={};raw.forEach(P=>{const k=Math.round(P.tx)+","+Math.round(P.ty);(groups[k]=groups[k]||[]).push(P);});
+  const golden=2.399963, pts=[];
+  Object.values(groups).forEach(g=>{
+    g.forEach((P,j)=>{const rr=minD*0.62*Math.sqrt(j),a=j*golden;P.x=P.tx+(j?rr*Math.cos(a):0);P.y=P.ty+(j?rr*Math.sin(a):0);pts.push(P);});
+  });
   for(let it=0;it<400;it++){
     let moved=false;
     for(let a=0;a<pts.length;a++)for(let b=a+1;b<pts.length;b++){
       const A=pts[a],B=pts[b];let dx=B.x-A.x,dy=B.y-A.y,d=Math.hypot(dx,dy);
-      if(d<0.001){const ang=(a*12.9898+b*78.233);dx=Math.cos(ang);dy=Math.sin(ang);d=1;}
+      if(d<0.001){const an=a*12.9898+b*78.233;dx=Math.cos(an);dy=Math.sin(an);d=1;}
       if(d<minD){const p=(minD-d)/2+0.01,ux=dx/d,uy=dy/d;A.x-=ux*p;A.y-=uy*p;B.x+=ux*p;B.y+=uy*p;moved=true;}
     }
-    pts.forEach(P=>{P.x=Math.max(x0+R,Math.min(x1-R,P.x));P.y=Math.max(y0+R,Math.min(y1-R,P.y));});
+    pts.forEach(P=>{P.x=Math.max(x0+R,Math.min(x1-R,P.x));P.y=Math.max(dotTop,Math.min(dotBot,P.y));});
     if(!moved)break;
   }
   pts.forEach(P=>{
